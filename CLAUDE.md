@@ -296,7 +296,7 @@ All 4 phases complete:
 - **Professional**: VitePress site with search, modern navigation, mobile-responsive
 - **Community-Friendly**: GitHub Wiki for quick access, familiar interface
 - **Fast**: Wiki sync ~2 min, Pages deploy ~5 min from commit to live
-- **Safe**: GITHUB_TOKEN for Pages (no PAT needed), separate WIKI_TOKEN for wiki
+- **Safe**: GITHUB_TOKEN for Pages (no PAT needed), PROJECTS_TOKEN for wiki (already configured)
 
 **Architecture**:
 ```
@@ -307,7 +307,7 @@ docs/ folder (source of truth)
 ```
 
 **Next Steps (Setup Required)**:
-1. Create WIKI_TOKEN secret (Personal Access Token with repo scope)
+1. PROJECTS_TOKEN secret already configured ✅ (used for both project board and wiki sync)
 2. Enable GitHub Pages (Settings → Pages → Source: GitHub Actions)
 3. Enable Wiki (Settings → Features → Wikis)
 4. Push to main → both workflows auto-run

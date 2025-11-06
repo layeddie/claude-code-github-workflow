@@ -167,7 +167,7 @@ jobs:
         uses: Andrew-Chen-Wang/github-wiki-action@v4
         env:
           WIKI_DIR: wiki/
-          GH_TOKEN: ${{ secrets.WIKI_TOKEN }}
+          GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
           GH_MAIL: wiki-bot@users.noreply.github.com
           GH_NAME: Wiki Bot
           REPO: ${{ github.repository }}
@@ -184,7 +184,7 @@ jobs:
         run: |
           echo "❌ Wiki sync failed!"
           echo "Please check:"
-          echo "  1. WIKI_TOKEN secret is configured with correct permissions"
+          echo "  1. PROJECTS_TOKEN secret is configured with correct permissions"
           echo "  2. Repository wiki is enabled (Settings → Features → Wikis)"
           echo "  3. Transformation scripts executed successfully"
           echo "  4. Wiki content validates correctly"
