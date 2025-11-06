@@ -1,0 +1,78 @@
+{
+  "milestone": "Todo App MVP",
+  "description": "Build a simple todo application with Next.js demonstrating the complete blueprint workflow",
+  "tasks": [
+    {
+      "title": "Setup Next.js project structure",
+      "description": "Configure Next.js project with proper organization and tooling.\n\n## Tasks\n- Create component directories (components/, utils/, types/)\n- Configure ESLint and Prettier\n- Setup TypeScript strict mode\n- Add global styles\n- Configure path aliases (@/*)",
+      "acceptanceCriteria": [
+        "All directories created with proper structure",
+        "ESLint configuration validates without errors",
+        "TypeScript compiles without errors",
+        "Path aliases work correctly"
+      ],
+      "priority": "high",
+      "type": "feature",
+      "platform": "web",
+      "dependencies": []
+    },
+    {
+      "title": "Create Todo data model and utilities",
+      "description": "Define Todo interface and create utility functions for data management.\n\n## Implementation\n- Define Todo interface (id, text, completed, createdAt)\n- Create sample todo data\n- Add utility functions (addTodo, deleteTodo, toggleTodo)\n- Setup local storage helpers",
+      "acceptanceCriteria": [
+        "Todo interface properly typed",
+        "Utility functions work correctly",
+        "Local storage persists data",
+        "Unit tests pass for all utilities"
+      ],
+      "priority": "high",
+      "type": "feature",
+      "platform": "web",
+      "dependencies": [1]
+    },
+    {
+      "title": "Build Todo list UI components",
+      "description": "Create reusable components for displaying todo items and the todo list.\n\n## Components\n- TodoList component (displays list of todos)\n- TodoItem component (individual todo with checkbox)\n- EmptyState component (when no todos)\n- Add CSS modules for styling",
+      "acceptanceCriteria": [
+        "Components render correctly",
+        "Props properly typed",
+        "Styling matches design",
+        "Accessible (keyboard navigation, ARIA labels)"
+      ],
+      "priority": "high",
+      "type": "feature",
+      "platform": "web",
+      "dependencies": [2]
+    },
+    {
+      "title": "Add create and delete Todo functionality",
+      "description": "Implement CRUD operations for creating and deleting todos.\n\n## Features\n- TodoForm component with input field\n- Submit handler for creating todos\n- Delete button on each TodoItem\n- Optimistic UI updates\n- Form validation (no empty todos)",
+      "acceptanceCriteria": [
+        "Can create new todos",
+        "Can delete existing todos",
+        "Form validates input",
+        "UI updates immediately",
+        "State persists to local storage"
+      ],
+      "priority": "high",
+      "type": "feature",
+      "platform": "web",
+      "dependencies": [2, 3]
+    },
+    {
+      "title": "Add Todo filtering (all/active/completed)",
+      "description": "Implement filter functionality to view todos by completion status.\n\n## Implementation\n- Create FilterButtons component\n- Add filter state (all, active, completed)\n- Filter logic based on selected filter\n- Persist selected filter\n- Show active filter count",
+      "acceptanceCriteria": [
+        "All three filters work correctly",
+        "Active count updates accurately",
+        "Filter state persists across page refreshes",
+        "Keyboard navigation works",
+        "Clear visual indication of active filter"
+      ],
+      "priority": "medium",
+      "type": "feature",
+      "platform": "web",
+      "dependencies": [2, 3, 4]
+    }
+  ]
+}

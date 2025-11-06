@@ -1,0 +1,8 @@
+{
+  "title": "feat(structure): Setup Next.js project structure",
+  "body": "## Summary\n\nConfigure Next.js project with proper organization and tooling.\n\n## Changes\n\n- Created component directories (components/, utils/, types/)\n- Configured ESLint and Prettier\n- Setup TypeScript strict mode\n- Added global styles\n- Configured path aliases (@/*)\n\n## Type of Change\n\n- [x] New feature (non-breaking change which adds functionality)\n- [ ] Bug fix (non-breaking change which fixes an issue)\n- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)\n\n## Testing\n\n- [x] ESLint passes without errors\n- [x] TypeScript compiles without errors\n- [x] Path aliases work correctly\n- [x] Build completes successfully\n\n## Checklist\n\n- [x] Code follows project style guidelines\n- [x] Self-review of code completed\n- [x] Changes generate no new warnings\n- [x] Tests added for new functionality\n- [x] All tests passing\n\n## Related Issues\n\nCloses #1\n\n---\n\n_Generated with [Claude Code](https://claude.com/claude-code)_\n\n_Co-Authored-By: Claude <noreply@anthropic.com>_",
+  "base": "dev",
+  "head": "feature/issue-1-setup-nextjs-project-structure",
+  "labels": ["type:feature", "platform:web"],
+  "draft": false
+}
