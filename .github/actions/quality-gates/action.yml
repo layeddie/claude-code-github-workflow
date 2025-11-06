@@ -1,0 +1,202 @@
+name: 'Quality Gates'
+description: 'Orchestrated quality check runner for comprehensive code validation'
+author: 'Alireza Rezvani'
+
+branding:
+  icon: 'check'
+  color: 'green'
+
+inputs:
+  checks:
+    description: 'Comma-separated list of checks to run (lint,typecheck,test,security,build)'
+    required: false
+    default: 'lint,typecheck,test'
+  fail-fast:
+    description: 'Stop on first failure (default: false)'
+    required: false
+    default: 'false'
+  working-directory:
+    description: 'Working directory for checks (default: .)'
+    required: false
+    default: '.'
+
+outputs:
+  passed:
+    description: 'Boolean indicating if all checks passed (true/false)'
+    value: ${{ steps.run-checks.outputs.passed }}
+  failed-checks:
+    description: 'Comma-separated list of failed checks'
+    value: ${{ steps.run-checks.outputs.failed-checks }}
+  summary:
+    description: 'Markdown summary of all check results'
+    value: ${{ steps.run-checks.outputs.summary }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run Quality Checks
+      id: run-checks
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CHECKS: ${{ inputs.checks }}
+        FAIL_FAST: ${{ inputs.fail-fast }}
+      run: |
+        echo "::group::🔍 Quality Gates"
+
+        # Initialize tracking
+        PASSED="true"
+        FAILED_CHECKS=""
+        TOTAL_CHECKS=0
+        PASSED_CHECKS=0
+        FAILED_CHECKS_COUNT=0
+
+        # Parse checks list
+        IFS=',' read -ra CHECK_ARRAY <<< "$CHECKS"
+
+        # Summary header
+        echo "📊 Running Quality Checks..."
+        echo ""
+
+        # Initialize summary markdown
+        SUMMARY="## Quality Gates Results\n\n"
+        SUMMARY+="| Check | Status | Details |\n"
+        SUMMARY+="|-------|--------|----------|\n"
+
+        # Function to run a check
+        run_check() {
+          local check_name=$1
+          local check_command=$2
+          local check_display=$3
+
+          TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🔧 Running: $check_display"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          # Run the check
+          if eval "$check_command" 2>&1; then
+            echo "✅ $check_display: PASSED"
+            SUMMARY+="| $check_display | ✅ Passed | - |\n"
+            PASSED_CHECKS=$((PASSED_CHECKS + 1))
+            return 0
+          else
+            EXIT_CODE=$?
+            echo "❌ $check_display: FAILED (exit code: $EXIT_CODE)"
+            SUMMARY+="| $check_display | ❌ Failed | Exit code: $EXIT_CODE |\n"
+            PASSED="false"
+            FAILED_CHECKS_COUNT=$((FAILED_CHECKS_COUNT + 1))
+
+            if [[ -z "$FAILED_CHECKS" ]]; then
+              FAILED_CHECKS="$check_name"
+            else
+              FAILED_CHECKS="$FAILED_CHECKS,$check_name"
+            fi
+
+            if [[ "$FAIL_FAST" == "true" ]]; then
+              echo "::error::$check_display failed. Stopping due to fail-fast mode."
+              return 1
+            fi
+
+            return 0
+          fi
+        }
+
+        # Run each requested check
+        for check in "${CHECK_ARRAY[@]}"; do
+          check=$(echo "$check" | xargs) # trim whitespace
+
+          case $check in
+            lint)
+              if run_check "lint" "npm run lint" "ESLint + Prettier"; then
+                continue
+              else
+                [[ "$FAIL_FAST" == "true" ]] && break
+              fi
+              ;;
+
+            typecheck)
+              if run_check "typecheck" "npm run type-check" "TypeScript Type Check"; then
+                continue
+              else
+                [[ "$FAIL_FAST" == "true" ]] && break
+              fi
+              ;;
+
+            test)
+              if run_check "test" "npm run test" "Unit Tests"; then
+                continue
+              else
+                [[ "$FAIL_FAST" == "true" ]] && break
+              fi
+              ;;
+
+            security)
+              if run_check "security" "npm audit --audit-level=moderate" "Security Audit"; then
+                continue
+              else
+                [[ "$FAIL_FAST" == "true" ]] && break
+              fi
+              ;;
+
+            build)
+              if run_check "build" "npm run build" "Production Build"; then
+                continue
+              else
+                [[ "$FAIL_FAST" == "true" ]] && break
+              fi
+              ;;
+
+            *)
+              echo "⚠️  Unknown check: $check (skipping)"
+              SUMMARY+="| $check | ⚠️  Skipped | Unknown check type |\n"
+              ;;
+          esac
+        done
+
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📈 Quality Gates Summary"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "Total Checks: $TOTAL_CHECKS"
+        echo "Passed: $PASSED_CHECKS"
+        echo "Failed: $FAILED_CHECKS_COUNT"
+        echo ""
+
+        # Add summary footer
+        SUMMARY+="\n---\n\n"
+        SUMMARY+="**Total**: $TOTAL_CHECKS checks | "
+        SUMMARY+="**Passed**: $PASSED_CHECKS | "
+        SUMMARY+="**Failed**: $FAILED_CHECKS_COUNT\n"
+
+        if [[ "$PASSED" == "true" ]]; then
+          echo "✅ All quality gates passed!"
+          SUMMARY+="\n✅ **All quality gates passed!**"
+        else
+          echo "❌ Some quality gates failed: $FAILED_CHECKS"
+          SUMMARY+="\n❌ **Failed checks**: $FAILED_CHECKS"
+        fi
+
+        # Set outputs
+        echo "passed=$PASSED" >> $GITHUB_OUTPUT
+        echo "failed-checks=$FAILED_CHECKS" >> $GITHUB_OUTPUT
+        echo "summary<<EOF" >> $GITHUB_OUTPUT
+        echo -e "$SUMMARY" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+        echo "::endgroup::"
+
+        # Exit with appropriate code
+        if [[ "$PASSED" == "false" ]]; then
+          exit 1
+        fi
+
+    - name: Quality Gates Summary
+      shell: bash
+      if: always()
+      run: |
+        if [[ "${{ steps.run-checks.outputs.passed }}" == "true" ]]; then
+          echo "::notice::✅ All quality gates passed!"
+        else
+          echo "::error::❌ Quality gates failed: ${{ steps.run-checks.outputs.failed-checks }}"
+        fi

@@ -1,0 +1,73 @@
+# Conventional Commit Template
+#
+# Format: <type>(<scope>): <subject>
+#
+# Types:
+#   feat:     New feature
+#   fix:      Bug fix
+#   docs:     Documentation only changes
+#   style:    Code style changes (formatting, missing semi-colons, etc)
+#   refactor: Code refactoring (neither fixes a bug nor adds a feature)
+#   perf:     Performance improvement
+#   test:     Adding or updating tests
+#   build:    Changes to build system or dependencies
+#   ci:       Changes to CI/CD configuration
+#   chore:    Other changes that don't modify src or test files
+#   revert:   Revert a previous commit
+#
+# Scope:
+#   Use kebab-case (e.g., workflows, composite-actions, project-sync)
+#   Optional but recommended for clarity
+#
+# Subject:
+#   - Use imperative, present tense: "add" not "added" nor "adds"
+#   - Don't capitalize first letter
+#   - No period (.) at the end
+#   - Maximum 72 characters
+#
+# Example:
+#   feat(workflows): add claude-plan-to-issues workflow
+#
+# ─────────────────────────────────────────────────────────────────
+
+<type>(<scope>): <subject>
+
+# ─────────────────────────────────────────────────────────────────
+# Context
+# ─────────────────────────────────────────────────────────────────
+# Why is this change needed? What problem does it solve?
+# Reference any related issues: Closes #123, Relates to #456
+
+Context:
+
+
+# ─────────────────────────────────────────────────────────────────
+# Testing
+# ─────────────────────────────────────────────────────────────────
+# How was this change tested? What tests were added or modified?
+# Include manual testing steps if applicable
+
+Testing:
+
+
+# ─────────────────────────────────────────────────────────────────
+# Reviewers
+# ─────────────────────────────────────────────────────────────────
+# Tag reviewers or leave blank for automatic assignment
+# Format: @username
+
+Reviewers:
+
+
+# ─────────────────────────────────────────────────────────────────
+# Breaking Changes (if any)
+# ─────────────────────────────────────────────────────────────────
+# Describe any breaking changes and migration steps
+
+BREAKING CHANGE:
+
+
+# ─────────────────────────────────────────────────────────────────
+# Notes
+# ─────────────────────────────────────────────────────────────────
+# Additional notes, considerations, or follow-up tasks

@@ -1,0 +1,117 @@
+name: 'Setup Node.js and pnpm'
+description: 'Fast, cached setup of Node.js and pnpm with dependency installation'
+author: 'Alireza Rezvani'
+
+branding:
+  icon: 'package'
+  color: 'green'
+
+inputs:
+  node-version:
+    description: 'Node.js version to install (default: 20)'
+    required: false
+    default: '20'
+  pnpm-version:
+    description: 'pnpm version to install (default: 9)'
+    required: false
+    default: '9'
+  working-directory:
+    description: 'Working directory for installation (default: .)'
+    required: false
+    default: '.'
+  cache-dependency-path:
+    description: 'Path to dependency lock file (default: **/pnpm-lock.yaml)'
+    required: false
+    default: '**/pnpm-lock.yaml'
+  skip-install:
+    description: 'Skip dependency installation (default: false)'
+    required: false
+    default: 'false'
+
+outputs:
+  cache-hit:
+    description: 'Boolean indicating if cache was hit (true/false)'
+    value: ${{ steps.cache-dependencies.outputs.cache-hit }}
+  node-version:
+    description: 'Installed Node.js version'
+    value: ${{ steps.setup-node.outputs.node-version }}
+  pnpm-version:
+    description: 'Installed pnpm version'
+    value: ${{ steps.setup-pnpm.outputs.pnpm-version }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      id: setup-node
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: 'pnpm'
+        cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+    - name: Setup pnpm
+      id: setup-pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: ${{ inputs.pnpm-version }}
+        run_install: false
+
+    - name: Get pnpm store directory
+      id: pnpm-store
+      shell: bash
+      run: |
+        echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+    - name: Cache dependencies
+      id: cache-dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ steps.pnpm-store.outputs.STORE_PATH }}
+          ${{ inputs.working-directory }}/node_modules
+        key: ${{ runner.os }}-pnpm-${{ hashFiles(inputs.cache-dependency-path) }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-
+
+    - name: Install dependencies
+      if: inputs.skip-install == 'false'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "::group::📦 Installing dependencies with pnpm"
+
+        # Check cache status
+        if [[ "${{ steps.cache-dependencies.outputs.cache-hit }}" == "true" ]]; then
+          echo "✅ Cache hit! Dependencies restored from cache."
+          echo "⚡ This significantly reduces installation time."
+        else
+          echo "📥 Cache miss. Installing dependencies..."
+          echo "⏱️  This may take a few minutes on first run."
+        fi
+
+        echo ""
+        echo "🔧 Configuration:"
+        echo "   - Node.js: $(node --version)"
+        echo "   - pnpm: $(pnpm --version)"
+        echo "   - Working Directory: ${{ inputs.working-directory }}"
+        echo ""
+
+        # Install with frozen lockfile for consistency
+        pnpm install --frozen-lockfile
+
+        echo ""
+        echo "✅ Dependencies installed successfully!"
+        echo "::endgroup::"
+
+    - name: Installation Summary
+      shell: bash
+      run: |
+        echo "::notice::📦 Node.js and pnpm setup complete"
+        echo "::notice::Node.js version: $(node --version)"
+        echo "::notice::pnpm version: $(pnpm --version)"
+        if [[ "${{ steps.cache-dependencies.outputs.cache-hit }}" == "true" ]]; then
+          echo "::notice::⚡ Cache Hit - Installation time reduced by ~90%"
+        else
+          echo "::notice::📥 Cache Miss - Dependencies installed fresh"
+        fi

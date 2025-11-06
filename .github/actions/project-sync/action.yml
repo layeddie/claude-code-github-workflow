@@ -1,0 +1,331 @@
+name: 'GitHub Project Sync'
+description: 'Sync issues with GitHub Projects v2 using GraphQL'
+author: 'Alireza Rezvani'
+
+branding:
+  icon: 'trello'
+  color: 'purple'
+
+inputs:
+  github-token:
+    description: 'GitHub token with project permissions (required)'
+    required: true
+  project-url:
+    description: 'GitHub Project URL (e.g., https://github.com/users/USER/projects/1)'
+    required: true
+  issue-number:
+    description: 'Issue number to sync'
+    required: true
+  status-field:
+    description: 'Name of the status field in the project (default: Status)'
+    required: false
+    default: 'Status'
+  status-value:
+    description: 'Target status value (e.g., Ready, In Progress, Done)'
+    required: true
+  repository:
+    description: 'Repository in format owner/repo (default: current repo)'
+    required: false
+    default: ${{ github.repository }}
+
+outputs:
+  success:
+    description: 'Boolean indicating if sync was successful (true/false)'
+    value: ${{ steps.sync-project.outputs.success }}
+  project-id:
+    description: 'Project node ID from GraphQL'
+    value: ${{ steps.sync-project.outputs.project-id }}
+  item-id:
+    description: 'Project item ID for the issue'
+    value: ${{ steps.sync-project.outputs.item-id }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Sync Issue to Project Board
+      id: sync-project
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        PROJECT_URL: ${{ inputs.project-url }}
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+        STATUS_FIELD: ${{ inputs.status-field }}
+        STATUS_VALUE: ${{ inputs.status-value }}
+        REPOSITORY: ${{ inputs.repository }}
+      run: |
+        echo "::group::🔄 GitHub Project Sync"
+
+        # Initialize outputs
+        SUCCESS="false"
+        PROJECT_ID=""
+        ITEM_ID=""
+
+        # Function for exponential backoff
+        retry_with_backoff() {
+          local max_attempts=3
+          local timeout=1
+          local attempt=1
+          local exitCode=0
+
+          while [[ $attempt -le $max_attempts ]]; do
+            if "$@"; then
+              return 0
+            fi
+
+            exitCode=$?
+
+            if [[ $attempt -lt $max_attempts ]]; then
+              echo "⚠️  Attempt $attempt failed. Retrying in ${timeout}s..."
+              sleep $timeout
+              timeout=$((timeout * 2))
+            fi
+
+            attempt=$((attempt + 1))
+          done
+
+          return $exitCode
+        }
+
+        # Check rate limit before proceeding
+        echo "🔍 Checking API rate limit..."
+        RATE_LIMIT=$(gh api rate_limit --jq '.resources.graphql.remaining')
+        echo "   - GraphQL API calls remaining: $RATE_LIMIT"
+
+        if [[ $RATE_LIMIT -lt 50 ]]; then
+          echo "::warning::Low GraphQL API rate limit ($RATE_LIMIT remaining). Proceeding with caution."
+        fi
+
+        # Extract owner and project number from URL
+        # Format: https://github.com/users/USER/projects/123 or https://github.com/orgs/ORG/projects/123
+        echo ""
+        echo "📋 Parsing project URL..."
+        if [[ $PROJECT_URL =~ github\.com/(users|orgs)/([^/]+)/projects/([0-9]+) ]]; then
+          OWNER_TYPE="${BASH_REMATCH[1]}"
+          OWNER="${BASH_REMATCH[2]}"
+          PROJECT_NUMBER="${BASH_REMATCH[3]}"
+          echo "   - Owner: $OWNER ($OWNER_TYPE)"
+          echo "   - Project Number: $PROJECT_NUMBER"
+        else
+          echo "::error::Invalid project URL format: $PROJECT_URL"
+          echo "Expected format: https://github.com/users/USER/projects/123 or https://github.com/orgs/ORG/projects/123"
+          exit 1
+        fi
+
+        # Step 1: Get Project ID
+        echo ""
+        echo "1️⃣  Fetching Project ID..."
+        if [[ $OWNER_TYPE == "users" ]]; then
+          PROJECT_QUERY='query($owner: String!, $number: Int!) {
+            user(login: $owner) {
+              projectV2(number: $number) {
+                id
+                title
+              }
+            }
+          }'
+          PROJECT_ID=$(retry_with_backoff gh api graphql \
+            -f query="$PROJECT_QUERY" \
+            -f owner="$OWNER" \
+            -F number="$PROJECT_NUMBER" \
+            --jq '.data.user.projectV2.id')
+        else
+          PROJECT_QUERY='query($owner: String!, $number: Int!) {
+            organization(login: $owner) {
+              projectV2(number: $number) {
+                id
+                title
+              }
+            }
+          }'
+          PROJECT_ID=$(retry_with_backoff gh api graphql \
+            -f query="$PROJECT_QUERY" \
+            -f owner="$OWNER" \
+            -F number="$PROJECT_NUMBER" \
+            --jq '.data.organization.projectV2.id')
+        fi
+
+        if [[ -z "$PROJECT_ID" || "$PROJECT_ID" == "null" ]]; then
+          echo "::error::Failed to fetch project ID. Check project URL and permissions."
+          exit 1
+        fi
+        echo "   ✅ Project ID: $PROJECT_ID"
+
+        # Step 2: Get Field ID for Status field
+        echo ""
+        echo "2️⃣  Fetching Status Field ID..."
+        FIELD_QUERY='query($projectId: ID!) {
+          node(id: $projectId) {
+            ... on ProjectV2 {
+              fields(first: 20) {
+                nodes {
+                  ... on ProjectV2SingleSelectField {
+                    id
+                    name
+                    options {
+                      id
+                      name
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }'
+
+        FIELD_DATA=$(retry_with_backoff gh api graphql \
+          -f query="$FIELD_QUERY" \
+          -f projectId="$PROJECT_ID")
+
+        FIELD_ID=$(echo "$FIELD_DATA" | jq -r \
+          ".data.node.fields.nodes[] | select(.name == \"$STATUS_FIELD\") | .id")
+
+        if [[ -z "$FIELD_ID" || "$FIELD_ID" == "null" ]]; then
+          echo "::error::Status field '$STATUS_FIELD' not found in project."
+          echo "Available fields:"
+          echo "$FIELD_DATA" | jq -r '.data.node.fields.nodes[].name'
+          exit 1
+        fi
+        echo "   ✅ Field ID: $FIELD_ID"
+
+        # Step 3: Get Option ID for target status value
+        echo ""
+        echo "3️⃣  Fetching Status Option ID..."
+        OPTION_ID=$(echo "$FIELD_DATA" | jq -r \
+          ".data.node.fields.nodes[] | select(.name == \"$STATUS_FIELD\") | .options[] | select(.name == \"$STATUS_VALUE\") | .id")
+
+        if [[ -z "$OPTION_ID" || "$OPTION_ID" == "null" ]]; then
+          echo "::error::Status value '$STATUS_VALUE' not found in field '$STATUS_FIELD'."
+          echo "Available options:"
+          echo "$FIELD_DATA" | jq -r ".data.node.fields.nodes[] | select(.name == \"$STATUS_FIELD\") | .options[].name"
+          exit 1
+        fi
+        echo "   ✅ Option ID: $OPTION_ID"
+
+        # Step 4: Get issue node ID
+        echo ""
+        echo "4️⃣  Fetching Issue Node ID..."
+        ISSUE_QUERY='query($owner: String!, $repo: String!, $number: Int!) {
+          repository(owner: $owner, name: $repo) {
+            issue(number: $number) {
+              id
+              title
+            }
+          }
+        }'
+
+        IFS='/' read -r REPO_OWNER REPO_NAME <<< "$REPOSITORY"
+        ISSUE_NODE_ID=$(retry_with_backoff gh api graphql \
+          -f query="$ISSUE_QUERY" \
+          -f owner="$REPO_OWNER" \
+          -f repo="$REPO_NAME" \
+          -F number="$ISSUE_NUMBER" \
+          --jq '.data.repository.issue.id')
+
+        if [[ -z "$ISSUE_NODE_ID" || "$ISSUE_NODE_ID" == "null" ]]; then
+          echo "::error::Failed to fetch issue #$ISSUE_NUMBER from $REPOSITORY"
+          exit 1
+        fi
+        echo "   ✅ Issue Node ID: $ISSUE_NODE_ID"
+
+        # Step 5: Add issue to project (if not already added)
+        echo ""
+        echo "5️⃣  Adding Issue to Project (if needed)..."
+        ADD_MUTATION='mutation($projectId: ID!, $contentId: ID!) {
+          addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+            item {
+              id
+            }
+          }
+        }'
+
+        ITEM_RESULT=$(retry_with_backoff gh api graphql \
+          -f query="$ADD_MUTATION" \
+          -f projectId="$PROJECT_ID" \
+          -f contentId="$ISSUE_NODE_ID" 2>&1) || true
+
+        # Extract item ID (either from successful add or from error if already exists)
+        ITEM_ID=$(echo "$ITEM_RESULT" | jq -r '.data.addProjectV2ItemById.item.id' 2>/dev/null)
+
+        if [[ -z "$ITEM_ID" || "$ITEM_ID" == "null" ]]; then
+          # Item might already exist, try to find it
+          echo "   ℹ️  Issue may already be in project, searching..."
+          ITEMS_QUERY='query($projectId: ID!) {
+            node(id: $projectId) {
+              ... on ProjectV2 {
+                items(first: 100) {
+                  nodes {
+                    id
+                    content {
+                      ... on Issue {
+                        id
+                        number
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }'
+
+          ITEM_ID=$(retry_with_backoff gh api graphql \
+            -f query="$ITEMS_QUERY" \
+            -f projectId="$PROJECT_ID" | \
+            jq -r ".data.node.items.nodes[] | select(.content.number == $ISSUE_NUMBER) | .id" | head -n 1)
+        fi
+
+        if [[ -z "$ITEM_ID" || "$ITEM_ID" == "null" ]]; then
+          echo "::error::Failed to add issue to project or find existing item"
+          exit 1
+        fi
+        echo "   ✅ Project Item ID: $ITEM_ID"
+
+        # Step 6: Update status field
+        echo ""
+        echo "6️⃣  Updating Status Field..."
+        UPDATE_MUTATION='mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+          updateProjectV2ItemFieldValue(
+            input: {
+              projectId: $projectId
+              itemId: $itemId
+              fieldId: $fieldId
+              value: { singleSelectOptionId: $optionId }
+            }
+          ) {
+            projectV2Item {
+              id
+            }
+          }
+        }'
+
+        UPDATE_RESULT=$(retry_with_backoff gh api graphql \
+          -f query="$UPDATE_MUTATION" \
+          -f projectId="$PROJECT_ID" \
+          -f itemId="$ITEM_ID" \
+          -f fieldId="$FIELD_ID" \
+          -f optionId="$OPTION_ID")
+
+        if echo "$UPDATE_RESULT" | jq -e '.data.updateProjectV2ItemFieldValue.projectV2Item.id' > /dev/null; then
+          echo "   ✅ Status updated successfully!"
+          SUCCESS="true"
+        else
+          echo "::error::Failed to update status field"
+          echo "$UPDATE_RESULT"
+          exit 1
+        fi
+
+        # Set outputs
+        echo "success=$SUCCESS" >> $GITHUB_OUTPUT
+        echo "project-id=$PROJECT_ID" >> $GITHUB_OUTPUT
+        echo "item-id=$ITEM_ID" >> $GITHUB_OUTPUT
+
+        # Summary
+        echo ""
+        echo "✅ Project Sync Complete!"
+        echo "   - Issue #$ISSUE_NUMBER → Status: $STATUS_VALUE"
+        echo "::endgroup::"
+
+    - name: Sync Summary
+      shell: bash
+      if: steps.sync-project.outputs.success == 'true'
+      run: |
+        echo "::notice::✅ Issue #${{ inputs.issue-number }} synced to project status: ${{ inputs.status-value }}"

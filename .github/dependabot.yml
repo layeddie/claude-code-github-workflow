@@ -1,0 +1,139 @@
+# Dependabot Configuration
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+
+updates:
+  # ─────────────────────────────────────────────────────────────────
+  # npm Dependencies (JavaScript/TypeScript)
+  # ─────────────────────────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "npm"
+      - "automerge"
+    reviewers:
+      - "alirezarezvani"
+    # Group minor and patch updates together
+    groups:
+      development-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+      production-dependencies:
+        dependency-type: "production"
+        update-types:
+          - "patch"
+
+  # ─────────────────────────────────────────────────────────────────
+  # GitHub Actions
+  # ─────────────────────────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "automerge"
+    reviewers:
+      - "alirezarezvani"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Gradle (Android/Mobile - Optional)
+  # ─────────────────────────────────────────────────────────────────
+  # Uncomment if project includes Android/Gradle
+  # - package-ecosystem: "gradle"
+  #   directory: "/android"
+  #   schedule:
+  #     interval: "weekly"
+  #     day: "tuesday"
+  #     time: "09:00"
+  #     timezone: "UTC"
+  #   open-pull-requests-limit: 5
+  #   commit-message:
+  #     prefix: "chore(deps)"
+  #     prefix-development: "chore(deps-dev)"
+  #     include: "scope"
+  #   labels:
+  #     - "dependencies"
+  #     - "gradle"
+  #     - "platform:mobile"
+  #   reviewers:
+  #     - "alirezarezvani"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Cocoapods (iOS - Optional)
+  # ─────────────────────────────────────────────────────────────────
+  # Uncomment if project includes iOS/Cocoapods
+  # - package-ecosystem: "bundler"
+  #   directory: "/ios"
+  #   schedule:
+  #     interval: "weekly"
+  #     day: "tuesday"
+  #     time: "10:00"
+  #     timezone: "UTC"
+  #   open-pull-requests-limit: 5
+  #   commit-message:
+  #     prefix: "chore(deps)"
+  #     include: "scope"
+  #   labels:
+  #     - "dependencies"
+  #     - "cocoapods"
+  #     - "platform:mobile"
+  #   reviewers:
+  #     - "alirezarezvani"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Docker (if using containers)
+  # ─────────────────────────────────────────────────────────────────
+  # Uncomment if project uses Docker
+  # - package-ecosystem: "docker"
+  #   directory: "/"
+  #   schedule:
+  #     interval: "weekly"
+  #     day: "wednesday"
+  #     time: "09:00"
+  #     timezone: "UTC"
+  #   open-pull-requests-limit: 3
+  #   commit-message:
+  #     prefix: "chore(deps)"
+  #     include: "scope"
+  #   labels:
+  #     - "dependencies"
+  #     - "docker"
+  #   reviewers:
+  #     - "alirezarezvani"
+
+# ─────────────────────────────────────────────────────────────────
+# Notes
+# ─────────────────────────────────────────────────────────────────
+# - PRs with "automerge" label can be auto-merged by bot if:
+#   * All CI checks pass
+#   * No conflicts
+#   * Semantic version bump is patch or minor (not major)
+#
+# - Weekly schedule ensures manageable PR volume
+#
+# - Grouped updates reduce PR noise for minor/patch updates
+#
+# - Adjust open-pull-requests-limit based on team capacity

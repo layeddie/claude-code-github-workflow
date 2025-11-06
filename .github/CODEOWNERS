@@ -1,0 +1,91 @@
+# CODEOWNERS - Code Ownership and Review Assignment
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Each line is a file pattern followed by one or more owners.
+# Owners will be requested for review when someone opens a pull request.
+#
+# Format: <pattern> @username @username @org/team-name
+#
+# Examples:
+#   *                     @default-owner
+#   /docs/                @doc-team
+#   *.js                  @js-developers
+#   /apps/frontend/       @frontend-team
+#
+
+# ─────────────────────────────────────────────────────────────────
+# Default Owners
+# ─────────────────────────────────────────────────────────────────
+# These owners will be the default owners for everything in the repo
+# unless a later match takes precedence.
+
+*                           @alirezarezvani
+
+# ─────────────────────────────────────────────────────────────────
+# GitHub Workflows & Actions
+# ─────────────────────────────────────────────────────────────────
+# All changes to GitHub Actions workflows and composite actions
+# require approval from workflow maintainers
+
+/.github/workflows/         @alirezarezvani
+/.github/actions/           @alirezarezvani
+
+# ─────────────────────────────────────────────────────────────────
+# Claude Code Automation
+# ─────────────────────────────────────────────────────────────────
+# Claude Code slash commands and subagents
+
+/.claude/                   @alirezarezvani
+
+# ─────────────────────────────────────────────────────────────────
+# Documentation
+# ─────────────────────────────────────────────────────────────────
+# All documentation files including markdown in docs/ and root
+
+/docs/                      @alirezarezvani
+*.md                        @alirezarezvani
+
+# ─────────────────────────────────────────────────────────────────
+# Setup & Configuration
+# ─────────────────────────────────────────────────────────────────
+# Setup scripts, wizard, and configuration templates
+
+/setup/                     @alirezarezvani
+
+# ─────────────────────────────────────────────────────────────────
+# Core Configuration Files
+# ─────────────────────────────────────────────────────────────────
+# Root-level configuration that affects entire project
+
+/implementation.md          @alirezarezvani
+/CLAUDE.md                  @alirezarezvani
+/.github/CODEOWNERS         @alirezarezvani
+/.github/dependabot.yml     @alirezarezvani
+
+# ─────────────────────────────────────────────────────────────────
+# Issue and PR Templates
+# ─────────────────────────────────────────────────────────────────
+
+/.github/ISSUE_TEMPLATE/    @alirezarezvani
+/.github/pull_request_template.md @alirezarezvani
+
+# ─────────────────────────────────────────────────────────────────
+# Testing
+# ─────────────────────────────────────────────────────────────────
+
+/tests/                     @alirezarezvani
+
+# ─────────────────────────────────────────────────────────────────
+# Notes for Future Team Growth
+# ─────────────────────────────────────────────────────────────────
+# As the team grows, add specific ownership rules:
+#
+# Example for team-based ownership:
+# /docs/                    @your-org/docs-team
+# /.github/workflows/       @your-org/devops-team
+# /.claude/                 @your-org/automation-team
+#
+# Example for platform-specific code (when applicable):
+# /mobile/                  @your-org/mobile-team
+# /web/                     @your-org/frontend-team
+# /api/                     @your-org/backend-team
