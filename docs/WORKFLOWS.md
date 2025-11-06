@@ -1,348 +1,585 @@
 # Workflows Reference
 
-Complete documentation for all 8 GitHub Actions workflows in the GitHub Workflow Blueprint.
+**Complete reference for all GitHub Actions workflows in the Blueprint**
+
+This guide documents all 8 core workflows that automate your development lifecycle from planning to deployment.
 
 ---
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [Workflow Execution Order](#workflow-execution-order)
-3. [Workflow 1: bootstrap.yml](#workflow-1-bootstrapyml)
-4. [Workflow 2: reusable-pr-checks.yml](#workflow-2-reusable-pr-checksyml)
-5. [Workflow 3: pr-into-dev.yml](#workflow-3-pr-into-devyml)
-6. [Workflow 4: dev-to-main.yml](#workflow-4-dev-to-mainyml)
-7. [Workflow 5: claude-plan-to-issues.yml](#workflow-5-claude-plan-to-issuesyml)
-8. [Workflow 6: create-branch-on-issue.yml](#workflow-6-create-branch-on-issueyml)
-9. [Workflow 7: pr-status-sync.yml](#workflow-7-pr-status-syncyml)
-10. [Workflow 8: release-status-sync.yml](#workflow-8-release-status-syncyml)
-11. [Best Practices](#best-practices)
-12. [Troubleshooting](#troubleshooting)
+- [Overview](#overview)
+- [Workflow Execution Order](#workflow-execution-order)
+- [Quick Reference Table](#quick-reference-table)
+- [Detailed Workflow Documentation](#detailed-workflow-documentation)
+  - [1. bootstrap.yml](#1-bootstrapyml)
+  - [2. reusable-pr-checks.yml](#2-reusable-pr-checksyml)
+  - [3. pr-into-dev.yml](#3-pr-into-devyml)
+  - [4. dev-to-main.yml](#4-dev-to-mainyml)
+  - [5. claude-plan-to-issues.yml](#5-claude-plan-to-issuesyml)
+  - [6. create-branch-on-issue.yml](#6-create-branch-on-issueyml)
+  - [7. pr-status-sync.yml](#7-pr-status-syncyml)
+  - [8. release-status-sync.yml](#8-release-status-syncyml)
+- [Workflow Relationships](#workflow-relationships)
+- [Best Practices](#best-practices)
+- [Common Customizations](#common-customizations)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Overview
 
-The blueprint includes 8 workflows that automate the complete development lifecycle:
+The GitHub Workflow Blueprint includes 8 specialized workflows that work together to automate your complete development lifecycle:
 
-| Workflow | Purpose | Trigger | Frequency |
-|----------|---------|---------|-----------|
-| **bootstrap.yml** | One-time setup | Manual | Once |
-| **reusable-pr-checks.yml** | Quality checks | Called by others | Per PR |
-| **pr-into-dev.yml** | Feature PR validation | PR to dev | Per PR |
-| **dev-to-main.yml** | Release validation | PR to main | Per release |
-| **claude-plan-to-issues.yml** | Plan to issues | Manual | As needed |
-| **create-branch-on-issue.yml** | Auto-branch | Issue labeled | Per issue |
-| **pr-status-sync.yml** | Status sync | PR events | Per PR event |
-| **release-status-sync.yml** | Release tracking | PR merged to main | Per release |
+### Core Workflows
+
+1. **bootstrap.yml** - One-time repository setup
+2. **reusable-pr-checks.yml** - Reusable quality gates (DRY)
+3. **pr-into-dev.yml** - Feature/fix PR validation
+4. **dev-to-main.yml** - Release gates for production
+5. **claude-plan-to-issues.yml** - Convert Claude plans to GitHub issues
+6. **create-branch-on-issue.yml** - Auto-create branches from issues
+7. **pr-status-sync.yml** - Sync PR lifecycle with issues
+8. **release-status-sync.yml** - Close issues on production deployment
+
+### Key Features
+
+- ✅ **Automated Quality Gates** - Lint, type-check, and test before merge
+- ✅ **Project Board Integration** - Bidirectional sync with GitHub Projects v2
+- ✅ **Branch Management** - Auto-create and cleanup branches
+- ✅ **Issue Tracking** - Automatic status updates throughout lifecycle
+- ✅ **Fork Safety** - Read-only operations for fork PRs
+- ✅ **Rate Limit Protection** - Circuit breakers prevent API exhaustion
+- ✅ **Idempotent Operations** - Safe to run multiple times
 
 ---
 
 ## Workflow Execution Order
 
-### Typical Development Flow
-
 ```
-1. bootstrap.yml (one-time)
-   ↓
-2. claude-plan-to-issues.yml (creates 10 issues)
-   ↓
-3. create-branch-on-issue.yml (creates feature branch)
-   ↓
-4. Developer commits to feature branch
-   ↓
-5. pr-into-dev.yml triggers
-   ├─→ reusable-pr-checks.yml (quality gates)
-   └─→ pr-status-sync.yml (update issue status)
-   ↓
-6. PR merged to dev
-   └─→ pr-status-sync.yml (update to "To Deploy")
-   ↓
-7. dev-to-main.yml triggers (release PR)
-   ├─→ Production checks
-   └─→ Smoke tests
-   ↓
-8. PR merged to main
-   └─→ release-status-sync.yml (close issues, create release)
+┌─────────────────────────────────────────────────────────────┐
+│ SETUP PHASE                                                  │
+└─────────────────────────────────────────────────────────────┘
+    │
+    └──> bootstrap.yml (manual, one-time)
+         │
+         └──> Creates labels, validates project board, sets up repo
+              │
+              │
+┌─────────────────────────────────────────────────────────────┐
+│ PLANNING PHASE                                               │
+└─────────────────────────────────────────────────────────────┘
+              │
+              └──> claude-plan-to-issues.yml (manual)
+                   │
+                   └──> Creates max 10 issues with labels + milestone
+                        │
+                        │
+┌─────────────────────────────────────────────────────────────┐
+│ DEVELOPMENT PHASE                                            │
+└─────────────────────────────────────────────────────────────┘
+                        │
+                        └──> create-branch-on-issue.yml (on label)
+                             │
+                             └──> Auto-creates feature/fix/hotfix branch
+                                  └──> Updates project status: In Progress
+                                       │
+                                       └──> Developer commits to branch
+                                            │
+                                            └──> Creates PR to dev
+                                                 │
+┌─────────────────────────────────────────────────────────────┐
+│ REVIEW PHASE                                                 │
+└─────────────────────────────────────────────────────────────┘
+                                                 │
+                                                 └──> pr-into-dev.yml (on PR open)
+                                                      ├──> Validates branch name
+                                                      ├──> Validates PR title (conventional)
+                                                      ├──> Validates linked issues
+                                                      └──> Calls reusable-pr-checks.yml
+                                                           ├──> Lint
+                                                           ├──> Type check
+                                                           ├──> Unit tests
+                                                           └──> Integration tests (optional)
+                                                      │
+                                                      └──> pr-status-sync.yml (on PR events)
+                                                           └──> Updates issues: In Review
+                                                                │
+                                                                └──> PR merged to dev
+                                                                     ├──> Deletes source branch
+                                                                     └──> Updates issues: To Deploy
+                                                                          │
+┌─────────────────────────────────────────────────────────────┐
+│ RELEASE PHASE                                                │
+└─────────────────────────────────────────────────────────────┘
+                                                                          │
+                                                                          └──> Create release PR (dev → main)
+                                                                               │
+                                                                               └──> dev-to-main.yml (on PR open)
+                                                                                    ├──> Production build
+                                                                                    ├──> Smoke tests
+                                                                                    ├──> Security scan
+                                                                                    └──> Deployment readiness
+                                                                                    │
+                                                                                    └──> PR merged to main
+                                                                                         │
+                                                                                         └──> release-status-sync.yml (on merge)
+                                                                                              ├──> Closes all linked issues
+                                                                                              ├──> Updates project: Done
+                                                                                              ├──> Creates GitHub release
+                                                                                              └──> Adds release comments
 ```
 
 ---
 
-## Workflow 1: bootstrap.yml
+## Quick Reference Table
 
-**Purpose**: One-time repository setup that creates labels, validates configuration, and prepares the repository for automation.
+| Workflow | Trigger | Purpose | Duration |
+|----------|---------|---------|----------|
+| **bootstrap.yml** | Manual (`workflow_dispatch`) | One-time repository setup | ~30s |
+| **reusable-pr-checks.yml** | Called by other workflows | DRY quality checks (lint, test, typecheck) | 1-2 min |
+| **pr-into-dev.yml** | PR opened to `dev` | Validate feature/fix PRs | 1-3 min |
+| **dev-to-main.yml** | PR opened to `main` | Release gates for production | 2-5 min |
+| **claude-plan-to-issues.yml** | Manual (`workflow_dispatch`) | Convert Claude plans to issues | 10-30s |
+| **create-branch-on-issue.yml** | Issue labeled | Auto-create feature branches | 5-10s |
+| **pr-status-sync.yml** | PR events (open, close, draft) | Sync PR lifecycle with issues | 5-10s |
+| **release-status-sync.yml** | PR merged to `main` | Close issues and update project | 10-20s |
 
-### Trigger
+---
+
+## Detailed Workflow Documentation
+
+### 1. bootstrap.yml
+
+**One-time repository setup**
+
+#### Purpose
+
+Initializes your repository with all required labels, validates project board configuration, and verifies secrets are properly set.
+
+#### When to Run
+
+- **First time setup**: After cloning the blueprint
+- **After major changes**: If you need to recreate labels
+- **Troubleshooting**: To validate configuration
+
+#### Trigger
 
 ```yaml
 on:
-  workflow_dispatch:  # Manual trigger only
+  workflow_dispatch:
+    inputs:
+      create_milestone:
+        description: 'Create initial milestone (optional)'
+        required: false
+        type: boolean
+        default: false
+      milestone_title:
+        description: 'Milestone title (if creating)'
+        required: false
+        type: string
+        default: 'Sprint 1'
+      milestone_due_date:
+        description: 'Milestone due date (YYYY-MM-DD, optional)'
+        required: false
+        type: string
 ```
 
-**When to run**: Once after cloning the blueprint to your repository.
+**How to trigger**: Go to **Actions** → **Bootstrap Repository** → **Run workflow**
 
-### What It Does
-
-1. **Creates Repository Labels**
-   - Status labels: `status:ready`, `status:in-progress`, `status:in-review`, `status:to-deploy`
-   - Type labels: `type:feature`, `type:fix`, `type:hotfix`, `type:docs`, `type:refactor`, `type:test`
-   - Platform labels: `platform:web`, `platform:mobile`, `platform:fullstack`
-   - Priority labels: `priority:critical`, `priority:high`, `priority:medium`, `priority:low`
-   - Meta label: `claude-code`
-
-2. **Validates Configuration**
-   - Checks PROJECT_URL secret exists
-   - Checks ANTHROPIC_API_KEY secret exists
-   - Validates project board access
-   - Confirms GitHub token permissions
-
-3. **Generates Report**
-   - Lists all created/existing labels
-   - Confirms secret configuration
-   - Provides next steps
-
-### Permissions
+#### Permissions
 
 ```yaml
 permissions:
-  contents: write
+  contents: read
   issues: write
-  project: read
+  pull-requests: write
 ```
 
-### Running the Workflow
+#### What It Does
 
+1. **Validates Required Secrets**
+   - `ANTHROPIC_API_KEY` - Claude Code API key
+   - `PROJECT_URL` - GitHub Projects v2 board URL
+   - `GITHUB_TOKEN` - Automatically provided
+
+2. **Creates Required Labels** (23 total)
+   - **Status**: `status:to-triage`, `status:ready`, `status:in-progress`, `status:in-review`, `status:to-deploy`
+   - **Type**: `type:feature`, `type:fix`, `type:hotfix`, `type:docs`, `type:refactor`, `type:test`
+   - **Platform**: `platform:web`, `platform:mobile`, `platform:fullstack`
+   - **Priority**: `priority:critical`, `priority:high`, `priority:medium`, `priority:low`
+   - **Meta**: `claude-code`, `automerge`, `dependencies`
+
+3. **Validates Project Board**
+   - Extracts project ID from `PROJECT_URL`
+   - Verifies `Status` field exists
+   - Lists available status options
+   - Checks GraphQL connectivity
+
+4. **Creates Initial Milestone** (optional)
+   - Only if `create_milestone` input is `true`
+   - Uses provided `milestone_title` and `milestone_due_date`
+   - Idempotent (skips if milestone already exists)
+
+5. **Generates Summary Report**
+   - Shows validation results
+   - Lists created/skipped labels
+   - Displays project board details
+   - Provides next steps
+
+#### Example Usage
+
+**Basic setup (no milestone)**:
+```bash
+# Via GitHub Actions UI
+Actions → Bootstrap Repository → Run workflow
+```
+
+**With milestone**:
+```yaml
+# Inputs in GitHub Actions UI
+create_milestone: true
+milestone_title: "Sprint 1 - MVP Features"
+milestone_due_date: "2025-12-31"
+```
+
+**Via GitHub CLI**:
+```bash
+gh workflow run bootstrap.yml \
+  -f create_milestone=true \
+  -f milestone_title="Sprint 1" \
+  -f milestone_due_date="2025-12-31"
+```
+
+#### Configuration
+
+**Required Secrets** (in repository settings):
+```
+ANTHROPIC_API_KEY=sk-ant-...
+PROJECT_URL=https://github.com/users/USERNAME/projects/1
+# or
+PROJECT_URL=https://github.com/orgs/ORGNAME/projects/1
+```
+
+**Setting secrets**:
 ```bash
 # Via GitHub CLI
-gh workflow run bootstrap.yml
+gh secret set ANTHROPIC_API_KEY
+# Paste your API key when prompted
 
-# Wait for completion
-gh run watch
-
-# Check results
-gh run view --log
-
-# Via GitHub UI
-# Go to: Actions → Bootstrap Repository → Run workflow
+gh secret set PROJECT_URL
+# Paste your project board URL when prompted
 ```
 
-### Configuration
+#### Troubleshooting
 
-No configuration needed. Uses repository secrets:
-- `PROJECT_URL` - Your GitHub Projects v2 board URL
-- `ANTHROPIC_API_KEY` - Your Claude API key
-- `GITHUB_TOKEN` - Auto-provided by GitHub
+**Problem**: `❌ ANTHROPIC_API_KEY is not set`
 
-### Expected Output
-
-```
-✅ Created label: claude-code (#7e57c2)
-✅ Created label: status:ready (#0e8a16)
-✅ Created label: type:feature (#1d76db)
-...
-✅ Validated PROJECT_URL secret
-✅ Validated ANTHROPIC_API_KEY secret
-✅ Project board access confirmed
-✅ Bootstrap complete!
-```
-
-### Troubleshooting
-
-**Error**: "Label already exists"
-- **Not an error**: Workflow is idempotent, safe to re-run
-- Existing labels are skipped
-
-**Error**: "PROJECT_URL not found"
-- Check secret is set: `gh secret list | grep PROJECT_URL`
-- Format: `https://github.com/users/USERNAME/projects/NUMBER`
-- Set secret: `gh secret set PROJECT_URL`
-
-**Error**: "Insufficient permissions"
-- Ensure GitHub token has `contents: write` and `issues: write`
-- Check Settings → Actions → General → Workflow permissions
+**Solution**:
+1. Go to **Settings** → **Secrets and variables** → **Actions**
+2. Click **New repository secret**
+3. Name: `ANTHROPIC_API_KEY`
+4. Value: Your Claude API key (get from https://console.anthropic.com/)
+5. Click **Add secret**
 
 ---
 
-## Workflow 2: reusable-pr-checks.yml
+**Problem**: `❌ Invalid PROJECT_URL format`
 
-**Purpose**: Reusable workflow that runs quality checks (lint, typecheck, tests) for DRY principle.
+**Solution**: PROJECT_URL must match one of these formats:
+```
+https://github.com/users/USERNAME/projects/NUMBER
+https://github.com/orgs/ORGNAME/projects/NUMBER
+```
 
-### Trigger
+To find your project URL:
+1. Go to your GitHub project board
+2. Copy the URL from your browser
+3. Ensure it's the v2 project format (not classic projects)
+
+---
+
+**Problem**: `❌ 'Status' field not found in project board`
+
+**Solution**:
+1. Open your GitHub project board
+2. Click **Settings** (⚙️) → **Fields**
+3. Create a new **Single select** field named `Status`
+4. Add these options (recommended):
+   - To triage
+   - Backlog
+   - Ready
+   - In Progress
+   - In Review
+   - To Deploy
+   - Done
+5. Save and re-run bootstrap
+
+---
+
+**Problem**: `Label already exists` warnings
+
+**Solution**: This is **normal and safe**. The workflow is idempotent - it skips existing labels and only creates missing ones. No action needed.
+
+---
+
+#### Success Indicators
+
+✅ All secrets validated
+✅ 23 labels created (or already exist)
+✅ Project board validated
+✅ Status field found
+✅ Milestone created (if requested)
+
+#### Next Steps After Bootstrap
+
+1. **Create your first issue** using the `plan-task` or `manual-task` template
+2. **Label it** with `claude-code` + `status:ready` to trigger auto-branch creation
+3. **Start working** on your feature branches
+4. **Create PRs** to `dev` branch
+
+---
+
+### 2. reusable-pr-checks.yml
+
+**Reusable quality gates workflow (DRY)**
+
+#### Purpose
+
+Provides a centralized, reusable workflow for running quality checks (lint, typecheck, tests) on pull requests. Used by other workflows to avoid code duplication.
+
+#### Trigger
 
 ```yaml
 on:
   workflow_call:
     inputs:
       mobile_check:
+        description: 'Run mobile platform checks (iOS/Android)'
         type: boolean
         default: false
       integration_tests:
+        description: 'Run integration tests'
         type: boolean
         default: false
+      node_version:
+        description: 'Node.js version to use'
+        type: string
+        default: '20'
+      pnpm_version:
+        description: 'pnpm version to use'
+        type: string
+        default: '9'
+      working_directory:
+        description: 'Working directory for checks'
+        type: string
+        default: '.'
 ```
 
-**When it runs**: Called by other workflows (pr-into-dev.yml, dev-to-main.yml).
+**Not triggered directly** - called by other workflows like `pr-into-dev.yml`.
 
-### What It Does
-
-1. **Detects Changed Files**
-   - Uses `dorny/paths-filter@v3`
-   - Categorizes changes: `src`, `tests`, `mobile`, `config`
-
-2. **Runs Quality Checks** (in parallel)
-   - **Lint**: ESLint + Prettier validation
-   - **Type Check**: TypeScript validation
-   - **Unit Tests**: Jest/Vitest tests
-   - **Integration Tests**: (if enabled)
-   - **Mobile Checks**: iOS/Android builds (if enabled)
-
-3. **Caching**
-   - Caches `node_modules`
-   - Caches `.pnpm-store`
-   - Caches mobile dependencies (`.gradle`, `Pods`)
-
-4. **Reports Results**
-   - Sets GitHub status checks
-   - Comments on PR if failures
-   - Uploads test coverage artifacts
-
-### Jobs
-
-#### Job: `changes`
-Detects which files changed to optimize subsequent jobs.
-
-#### Job: `lint`
-```bash
-pnpm lint
-```
-
-#### Job: `typecheck`
-```bash
-pnpm type-check
-```
-
-#### Job: `test-unit`
-```bash
-pnpm test --ci --coverage
-```
-
-#### Job: `test-integration` (conditional)
-```bash
-pnpm test:integration
-```
-
-#### Job: `mobile-check` (conditional)
-```bash
-# iOS
-cd ios && pod install
-xcodebuild -workspace App.xcworkspace -scheme App build
-
-# Android
-cd android && ./gradlew assembleRelease
-```
-
-### Configuration
-
-Called by other workflows with inputs:
+#### Permissions
 
 ```yaml
-uses: ./.github/workflows/reusable-pr-checks.yml
-with:
-  mobile_check: false      # Enable mobile checks
-  integration_tests: true  # Enable integration tests
+permissions:
+  contents: read
+  pull-requests: read
 ```
 
-### Required Scripts
+#### What It Does
 
-Your `package.json` must include:
+1. **Path Filtering** (Smart Execution)
+   - Detects which files changed in the PR
+   - Only runs relevant checks based on paths
+   - Skips checks if only docs changed
+   - Separate detection for web, mobile, tests
 
+2. **Quality Checks** (Parallel Execution)
+   - **Lint**: ESLint + Prettier validation
+   - **Type Check**: TypeScript compilation check
+   - **Unit Tests**: Jest/Vitest with coverage
+   - **Integration Tests**: Optional, enabled via input
+   - **Mobile Checks**: Optional iOS/Android build validation
+
+3. **Caching Strategy**
+   - Caches `node_modules` based on lock file hash
+   - Caches Gradle builds (Android)
+   - Caches CocoaPods (iOS)
+   - **90%+ speed improvement** on cache hits
+
+4. **Artifacts on Failure**
+   - Uploads lint reports, test results, coverage
+   - 2-day retention for debugging
+   - Only uploaded on failure to save storage
+
+5. **Summary Report**
+   - Shows pass/fail status for each check
+   - Aggregates results in one place
+   - Fails workflow if any check fails
+
+#### Example Usage
+
+**Called from another workflow**:
+```yaml
+jobs:
+  quality-checks:
+    uses: ./.github/workflows/reusable-pr-checks.yml
+    with:
+      mobile_check: false
+      integration_tests: false
+      node_version: '20'
+      pnpm_version: '9'
+```
+
+**With mobile checks enabled**:
+```yaml
+jobs:
+  quality-checks:
+    uses: ./.github/workflows/reusable-pr-checks.yml
+    with:
+      mobile_check: true
+      integration_tests: true
+      node_version: '20'
+      pnpm_version: '9'
+```
+
+#### Configuration
+
+**Required package.json scripts**:
 ```json
 {
   "scripts": {
-    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "lint": "eslint .",
     "type-check": "tsc --noEmit",
     "test": "jest",
-    "test:integration": "jest --config jest.integration.config.js"
+    "test:unit": "jest --testPathIgnorePatterns=integration",
+    "test:integration": "jest --testPathPattern=integration",
+    "format:check": "prettier --check ."
   }
 }
 ```
 
-### Caching Performance
+**Optional scripts** (auto-detected):
+```json
+{
+  "scripts": {
+    "prettier:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "ios:build": "react-native build-ios",
+    "android:build": "cd android && ./gradlew assembleRelease"
+  }
+}
+```
 
-| Run | Duration | Savings |
-|-----|----------|---------|
-| First (cold cache) | ~5 minutes | Baseline |
-| Second (warm cache) | ~30 seconds | 90% faster |
-| Typical PR | ~1 minute | 80% faster |
+#### Path Filters
 
-### Troubleshooting
+The workflow uses smart path filtering to skip unnecessary checks:
 
-**Error**: "pnpm: command not found"
-- Ensure you're using pnpm: `npm install -g pnpm`
-- Or switch to npm by editing workflow
+| Category | Paths | Checks Run |
+|----------|-------|------------|
+| **Web** | `src/`, `lib/`, `*.ts`, `*.tsx`, `package.json` | Lint, TypeCheck, Tests |
+| **Mobile** | `mobile/`, `ios/`, `android/`, `*.swift`, `*.kt` | Mobile Build |
+| **Tests** | `**/*.test.ts`, `**/*.spec.ts`, `__tests__/` | Tests Only |
+| **Docs Only** | `**.md`, `docs/` | **All Skipped** |
 
-**Error**: "Tests timing out"
-- Check test configuration
-- Increase timeout: `timeout-minutes: 15`
-- Optimize slow tests
+#### Troubleshooting
 
-**Error**: "Type check fails"
-- Run locally: `pnpm type-check`
-- Fix type errors
-- Commit and push
+**Problem**: `❌ ESLint not found`
+
+**Solution**: Add ESLint to your project:
+```bash
+pnpm add -D eslint @typescript-eslint/eslint-plugin @typescript-eslint/parser
+```
+
+Create `.eslintrc.json`:
+```json
+{
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint"],
+  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"]
+}
+```
 
 ---
 
-## Workflow 3: pr-into-dev.yml
+**Problem**: `❌ Type check failed`
 
-**Purpose**: Validates feature/fix/hotfix PRs before merging to dev branch.
+**Solution**: Fix TypeScript errors or adjust `tsconfig.json`:
+```json
+{
+  "compilerOptions": {
+    "strict": false,
+    "noEmit": true
+  }
+}
+```
 
-### Trigger
+---
+
+**Problem**: Cache not working (slow installs)
+
+**Solution**: Verify `pnpm-lock.yaml` is committed:
+```bash
+git add pnpm-lock.yaml
+git commit -m "chore: add pnpm lock file"
+```
+
+---
+
+**Problem**: Mobile checks failing
+
+**Solution**: Ensure mobile setup is correct or disable mobile checks:
+```yaml
+with:
+  mobile_check: false
+```
+
+---
+
+#### Performance Optimization
+
+**First run** (no cache):
+- Install dependencies: ~2 minutes
+- Lint: ~30 seconds
+- Type check: ~20 seconds
+- Tests: ~1 minute
+- **Total**: ~4 minutes
+
+**Subsequent runs** (with cache):
+- Install dependencies: ~10 seconds ✅
+- Lint: ~15 seconds
+- Type check: ~10 seconds
+- Tests: ~30 seconds
+- **Total**: ~1-2 minutes ✅
+
+**90%+ improvement with caching!**
+
+---
+
+### 3. pr-into-dev.yml
+
+**Feature/fix PR validation before merging to dev**
+
+#### Purpose
+
+Validates all pull requests into the `dev` branch to ensure they meet quality standards, follow conventions, and have proper issue linking before merge.
+
+#### Trigger
 
 ```yaml
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review]
-    branches: [dev]
+    types:
+      - opened
+      - synchronize
+      - ready_for_review
+    branches:
+      - dev
 ```
 
-**When it runs**: On every PR targeting the `dev` branch.
+**Triggers when**: A PR targeting `dev` is opened, updated, or marked ready for review.
 
-### What It Does
-
-1. **Branch Validation**
-   - Ensures PR is from valid branch pattern:
-     - `feature/*`
-     - `fix/*`
-     - `hotfix/*`
-   - Blocks PRs from invalid branches
-
-2. **Conventional Commit Check**
-   - Validates PR title format
-   - Enforces: `type(scope): description`
-   - Valid types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
-
-3. **Linked Issue Check**
-   - Ensures PR body contains issue reference
-   - Looks for: `Closes #N`, `Fixes #N`, `Resolves #N`
-   - Blocks PRs without linked issues
-
-4. **Quality Gates**
-   - Calls `reusable-pr-checks.yml`
-   - Runs lint, typecheck, tests
-   - All must pass before merge allowed
-
-5. **Fork Safety**
-   - Detects fork PRs
-   - Runs checks but skips write operations
-   - Prevents unauthorized modifications
-
-6. **Status Updates**
-   - Updates linked issues to "In Review"
-   - Comments on PR with check results
-   - Sets GitHub status checks
-
-### Permissions
+#### Permissions
 
 ```yaml
 permissions:
@@ -352,874 +589,1967 @@ permissions:
   statuses: write
 ```
 
-### Branch Patterns
+#### What It Does
 
-**Accepted** ✅:
-- `feature/issue-123-add-login`
-- `fix/issue-456-cors-error`
-- `hotfix/issue-789-critical-bug`
+1. **Fork Safety Check**
+   - Detects if PR is from a fork
+   - Skips write operations for fork PRs (security)
+   - Allows read-only checks to run
 
-**Rejected** ❌:
-- `main`
-- `dev`
-- `random-branch-name`
+2. **Branch Name Validation**
+   - Must start with `feature/`, `fix/`, or `hotfix/`
+   - Example: `feature/issue-123-add-user-auth`
+   - Rejects PRs from other branch patterns
 
-### Conventional Commit Examples
+3. **PR Title Validation (Conventional Commits)**
+   - Must follow: `type(scope): Subject`
+   - Valid types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
+   - Subject must start with uppercase
+   - Scope is optional
+   - Adds helpful comment if validation fails
 
-**Valid** ✅:
-```
-feat: add user authentication
-fix(api): resolve CORS issue
-docs: update README
-chore: bump dependencies
-```
+4. **Linked Issue Validation**
+   - Requires at least one linked issue in PR body
+   - Accepts: `Closes #123`, `Fixes #456`, `Resolves #789`, `Relates to #101`
+   - Adds helpful comment if missing
 
-**Invalid** ❌:
-```
-Added new feature
-Fixed bug
-Update
-```
+5. **Rate Limit Check**
+   - Ensures 50+ API calls remaining
+   - Circuit breaker prevents API exhaustion
+   - Shows remaining calls in logs
 
-### Linked Issue Formats
+6. **Quality Checks**
+   - Calls `reusable-pr-checks.yml`
+   - Runs lint, typecheck, unit tests
+   - Mobile and integration tests (optional)
 
-**Accepted** ✅:
+7. **Final Status**
+   - Aggregates all validation results
+   - Shows summary in PR
+   - Fails if any check fails
+
+#### Example Usage
+
+**Valid PR**:
 ```markdown
+Title: feat(auth): Add user authentication
+
+Body:
+## Summary
+This PR implements user authentication with JWT tokens.
+
+## Changes
+- Add login endpoint
+- Add JWT middleware
+- Add user model
+
 Closes #123
-Fixes #456
-Resolves #789
-Closes #123, #456
+Fixes #124
 ```
 
-**Required Location**: Must be in PR body, not just title.
-
-### Configuration
-
-No configuration needed. Works with repository structure.
-
-### Troubleshooting
-
-See [PR and Branch Issues](TROUBLESHOOTING.md#branch-and-pr-issues) in TROUBLESHOOTING.md
+✅ **Result**: All checks pass, ready to merge
 
 ---
 
-## Workflow 4: dev-to-main.yml
+**Invalid PR (wrong title)**:
+```markdown
+Title: added authentication
 
-**Purpose**: Release gates that validate production deployments before merging dev to main.
+Body:
+Implemented auth system
+```
 
-### Trigger
+❌ **Result**: PR title validation fails, bot comments with help
+
+---
+
+**Invalid PR (no linked issue)**:
+```markdown
+Title: feat(auth): Add authentication
+
+Body:
+Implemented auth system
+```
+
+❌ **Result**: Linked issue validation fails, bot comments with help
+
+---
+
+#### Configuration
+
+**Enable/disable mobile checks**:
+
+Edit `.github/workflows/pr-into-dev.yml`:
+```yaml
+uses: ./.github/workflows/reusable-pr-checks.yml
+with:
+  mobile_check: true  # Set to false to disable
+  integration_tests: true  # Set to false to disable
+```
+
+**Change Node.js version**:
+```yaml
+with:
+  node_version: '18'  # or '20', '21'
+  pnpm_version: '8'   # or '9'
+```
+
+#### Troubleshooting
+
+**Problem**: `❌ Invalid branch name: my-feature`
+
+**Solution**: Rename your branch to follow convention:
+```bash
+git branch -m feature/issue-123-my-feature
+git push origin -d my-feature  # Delete old branch
+git push origin feature/issue-123-my-feature
+```
+
+---
+
+**Problem**: `❌ PR title doesn't follow conventional commit format`
+
+**Solution**: Edit your PR title to match format:
+```
+feat: Add new feature
+feat(auth): Add user authentication
+fix(api): Resolve null pointer exception
+docs: Update README
+```
+
+See bot comment for full list of valid types.
+
+---
+
+**Problem**: `❌ No linked issues found`
+
+**Solution**: Edit your PR description and add:
+```markdown
+Closes #123
+```
+
+or
+
+```markdown
+Fixes #456
+Relates to #789
+```
+
+---
+
+**Problem**: Fork PR not running checks
+
+**Solution**: This is **expected behavior** for security. Fork PRs run read-only checks but skip write operations. If you're a maintainer, you can manually approve workflow runs for fork PRs.
+
+---
+
+#### Best Practices
+
+✅ **DO**:
+- Use conventional commit format for PR titles
+- Link at least one issue in PR description
+- Wait for all checks to pass before requesting review
+- Fix lint/test failures promptly
+
+❌ **DON'T**:
+- Merge PRs with failing checks
+- Skip linking issues (breaks automation)
+- Use generic PR titles like "updates" or "changes"
+- Force-push after PR is opened (breaks checks)
+
+---
+
+### 4. dev-to-main.yml
+
+**Release gates for production deployment**
+
+#### Purpose
+
+Validates release pull requests (dev → main) to ensure production readiness with additional checks beyond regular PRs.
+
+#### Trigger
 
 ```yaml
 on:
   pull_request:
-    types: [opened, synchronize]
-    branches: [main]
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches:
+      - main
 ```
 
-**When it runs**: On every PR targeting the `main` branch (typically dev → main).
+**Triggers when**: A PR targeting `main` is opened or updated.
 
-### What It Does
+#### Permissions
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+```
+
+#### What It Does
 
 1. **Source Branch Validation**
-   - Ensures PR is from `dev` branch only
-   - Blocks PRs from feature branches directly to main
+   - Ensures source is `dev` branch only
+   - Rejects PRs from other branches
+   - Enforces `dev → main` release flow
 
 2. **Production Build**
-   - Runs production build: `pnpm build`
-   - Validates build succeeds
-   - Checks bundle size (if configured)
+   - Runs production build: `npm run build:prod`
+   - Verifies build artifacts exist
+   - Uploads build artifacts (7-day retention)
+   - Checks build size and file count
 
 3. **Smoke Tests**
-   - Runs critical path tests
-   - Validates core functionality
-   - Fast execution (~1-2 minutes)
+   - Runs critical path smoke tests
+   - Tries: `npm run test:smoke`, `npm run test:e2e:smoke`
+   - Falls back to basic sanity checks
+   - Validates build artifacts present
 
-4. **Security Scan** (informational)
-   - Runs `npm audit`
-   - Continues on error (non-blocking)
-   - Reports vulnerabilities
+4. **Security Quick Scan** (Informational Only)
+   - Runs `npm audit` for vulnerabilities
+   - Checks for hardcoded secrets (basic regex)
+   - Checks for `console.log` and `debugger` statements
+   - **Non-blocking** - warnings only
 
 5. **Deployment Readiness**
-   - Checks changelog updated
-   - Validates version bump
-   - Confirms all tests pass
+   - Checks version in `package.json`
+   - Looks for changelog file
+   - Generates pre-deployment checklist
+   - Shows release information
 
-### Jobs
+6. **Final Status**
+   - Aggregates all release gate results
+   - Shows comprehensive summary
+   - Provides next steps for deployment
 
-#### Job: `validate-source`
-Ensures only dev → main PRs.
+#### Example Usage
 
-#### Job: `build-prod`
+**Create release PR**:
 ```bash
-NODE_ENV=production pnpm build
+# From dev branch
+git checkout dev
+git pull origin dev
+
+# Create PR to main
+gh pr create \
+  --base main \
+  --head dev \
+  --title "release: Version 1.2.0" \
+  --body "$(cat CHANGELOG.md | head -50)"
 ```
 
-#### Job: `smoke-tests`
+**Or use the `/release` slash command**:
 ```bash
-pnpm test:smoke
+/release
 ```
 
-#### Job: `security-scan`
-```bash
-npm audit --production
-# Continues on error
-```
+#### Configuration
 
-#### Job: `deployment-readiness`
-Validates:
-- ✅ CHANGELOG.md updated
-- ✅ package.json version bumped
-- ✅ All required checks passed
-
-### Required Scripts
-
+**Required package.json scripts**:
 ```json
 {
   "scripts": {
     "build": "next build",
-    "test:smoke": "jest smoke.test.js"
+    "build:prod": "NODE_ENV=production next build"
   }
 }
 ```
 
-### Configuration
-
-#### Optional: Bundle Size Check
-
-Add to workflow:
-```yaml
-- name: Check bundle size
-  run: |
-    SIZE=$(du -sh dist | cut -f1)
-    echo "Bundle size: $SIZE"
-    # Add your size limits here
+**Optional scripts**:
+```json
+{
+  "scripts": {
+    "test:smoke": "jest --testNamePattern='smoke'",
+    "test:e2e:smoke": "playwright test smoke/"
+  }
+}
 ```
 
-### Troubleshooting
+#### Production Build Directories
 
-**Error**: "Source branch must be 'dev'"
-- Create PR from dev to main, not feature to main
-- Merge feature to dev first
+The workflow checks for build outputs in these directories (in order):
+1. `dist/` - Vite, Rollup, esbuild
+2. `build/` - Create React App, Parcel
+3. `out/` - Next.js (static export)
+4. `.next/` - Next.js (server)
 
-**Error**: "Production build failed"
-- Run locally: `NODE_ENV=production pnpm build`
-- Fix build errors
-- Commit and push
+#### Smoke Tests
 
-**Error**: "Smoke tests failed"
-- Run locally: `pnpm test:smoke`
-- Fix failing tests
-- Ensure smoke tests are fast (<2 min)
+**What are smoke tests?**
+Smoke tests are **critical path tests** that verify the most important features work:
+
+**Example smoke tests**:
+```typescript
+describe('smoke tests', () => {
+  it('should load the homepage', async () => {
+    const response = await fetch('http://localhost:3000');
+    expect(response.status).toBe(200);
+  });
+
+  it('should authenticate user', async () => {
+    const result = await login('test@example.com', 'password');
+    expect(result.success).toBe(true);
+  });
+
+  it('should process payment', async () => {
+    // Critical payment flow test
+  });
+});
+```
+
+If no smoke tests exist, workflow validates build artifacts as basic sanity.
+
+#### Security Quick Scan
+
+**What it checks**:
+1. **npm audit**: High/critical vulnerabilities
+2. **Hardcoded secrets**: Patterns like `API_KEY`, `password`, `token`
+3. **Debug statements**: `console.log`, `debugger`
+
+**Note**: This is **informational only** and does **not block** the release. Review warnings and address before deploying.
+
+#### Deployment Readiness Checklist
+
+Before merging release PR, ensure:
+
+- [ ] Version bumped in `package.json`
+- [ ] Changelog updated with release notes
+- [ ] All linked issues are tested
+- [ ] Breaking changes documented
+- [ ] Migration guide provided (if needed)
+- [ ] Deployment plan reviewed
+- [ ] Rollback plan documented
+- [ ] Stakeholders notified
+
+#### Troubleshooting
+
+**Problem**: `❌ Invalid source branch: feature/my-feature`
+
+**Solution**: Only `dev → main` PRs are allowed for releases:
+```bash
+# Close current PR
+gh pr close
+
+# Create correct release PR from dev
+git checkout dev
+gh pr create --base main --head dev
+```
 
 ---
 
-## Workflow 5: claude-plan-to-issues.yml
+**Problem**: `❌ Production build failed`
 
-**Purpose**: Converts Claude Code plan JSON into GitHub issues with proper labels, milestones, and project board integration.
+**Solution**: Fix build errors locally first:
+```bash
+npm run build:prod
+# Fix any errors
+npm run build:prod  # Verify it works
+git add .
+git commit -m "fix: resolve production build issues"
+git push
+```
 
-### Trigger
+---
+
+**Problem**: `❌ Smoke tests failed`
+
+**Solution**: Run smoke tests locally:
+```bash
+npm run test:smoke
+# Fix failing tests
+npm run test:smoke  # Verify they pass
+git add .
+git commit -m "fix: resolve smoke test failures"
+git push
+```
+
+---
+
+**Problem**: `⚠️ No smoke tests found`
+
+**Solution**: This is **not an error**. The workflow will validate build artifacts instead. To add smoke tests:
+
+```bash
+# Install playwright (or use jest)
+pnpm add -D @playwright/test
+
+# Create smoke test
+mkdir -p tests/smoke
+cat > tests/smoke/critical-paths.spec.ts << EOF
+import { test, expect } from '@playwright/test';
+
+test('homepage loads', async ({ page }) => {
+  await page.goto('http://localhost:3000');
+  await expect(page).toHaveTitle(/My App/);
+});
+EOF
+
+# Add script
+# package.json:
+# "test:e2e:smoke": "playwright test tests/smoke"
+```
+
+---
+
+**Problem**: Security scan shows warnings
+
+**Solution**: Review warnings in workflow logs:
+```bash
+# Check npm audit
+npm audit
+
+# Fix vulnerabilities
+npm audit fix
+
+# Or ignore false positives
+npm audit --production  # Only check production deps
+```
+
+For hardcoded secrets/debug statements, search and remove:
+```bash
+grep -r "console.log" src/
+grep -r "debugger" src/
+```
+
+---
+
+#### Best Practices
+
+✅ **DO**:
+- Always release from `dev` branch
+- Bump version before creating release PR
+- Update changelog with all changes
+- Run production build locally first
+- Test critical paths thoroughly
+- Review security scan warnings
+
+❌ **DON'T**:
+- Create release PRs from feature branches
+- Skip version bumps
+- Merge without smoke tests passing
+- Ignore security warnings
+- Deploy with failing builds
+
+---
+
+### 5. claude-plan-to-issues.yml
+
+**Convert Claude Code plans (JSON) to GitHub issues**
+
+#### Purpose
+
+Transforms Claude Code planning output (JSON format) into organized GitHub issues with proper labels, milestones, dependencies, and project board integration.
+
+#### Trigger
 
 ```yaml
 on:
   workflow_dispatch:
     inputs:
       plan_json:
-        description: 'Claude plan JSON'
+        description: 'Claude plan in JSON format'
         required: true
+        type: string
+      milestone_title:
+        description: 'Milestone for these issues (optional)'
+        required: false
+        type: string
+      create_milestone:
+        description: 'Create milestone if it doesnt exist'
+        required: false
+        type: boolean
+        default: true
 ```
 
-**When to run**: After creating a plan in Claude Code, use this to generate GitHub issues.
+**How to trigger**:
+```bash
+# Via GitHub Actions UI
+Actions → Convert Claude Plan to Issues → Run workflow
 
-### What It Does
-
-1. **Validates Plan JSON**
-   - Checks JSON structure
-   - Validates required fields
-   - Enforces max 10 tasks limit
-
-2. **Creates Milestone**
-   - Uses plan metadata
-   - Sets title and description
-   - Assigns due date (if provided)
-
-3. **Generates Issues** (max 10)
-   - Creates issue for each task
-   - Sets title and description
-   - Adds acceptance criteria
-   - Assigns labels:
-     - `claude-code` (automatic)
-     - `status:ready` (automatic)
-     - Type label (`type:feature`, etc.)
-     - Platform label (`platform:web`, etc.)
-     - Priority label (`priority:high`, etc.)
-
-4. **Links Dependencies**
-   - Parses task dependencies
-   - Adds "Depends on #N" to issue body
-   - Creates proper issue references
-
-5. **Adds to Project Board**
-   - Uses GraphQL API
-   - Adds each issue to project
-   - Sets Status field to "Ready"
-
-6. **Calculates Priority**
-   - Uses explicit priority from plan
-   - Increases priority for blocking tasks
-   - Ensures proper task ordering
-
-### Input Format
-
-```json
-{
-  "milestone": {
-    "title": "User Authentication MVP",
-    "description": "Basic auth with JWT",
-    "dueDate": "2025-12-31"
-  },
-  "tasks": [
-    {
-      "title": "Create login form",
-      "description": "React form with validation",
-      "acceptanceCriteria": [
-        "Email and password fields",
-        "Client-side validation",
-        "Error handling"
-      ],
-      "priority": "high",
-      "type": "feature",
-      "platform": "web",
-      "dependencies": []
-    },
-    {
-      "title": "Implement JWT auth",
-      "description": "Backend auth service",
-      "acceptanceCriteria": [
-        "JWT generation",
-        "Token validation",
-        "Refresh token flow"
-      ],
-      "priority": "critical",
-      "type": "feature",
-      "platform": "web",
-      "dependencies": [1]
-    }
-  ]
-}
+# Or use /plan-to-issues slash command
+/plan-to-issues path/to/plan.json
 ```
 
-### Task Limit
-
-**Maximum**: 10 tasks per plan
-
-**Rationale**:
-- Keeps milestones focused
-- Prevents overwhelming project boards
-- Encourages proper planning
-
-**If you need more**: Create multiple plans.
-
-### Permissions
+#### Permissions
 
 ```yaml
 permissions:
   contents: read
   issues: write
-  projects: write
+  pull-requests: read
 ```
 
-### Running the Workflow
+#### What It Does
 
-```bash
-# Save your plan to file
-cat > plan.json <<'EOF'
+1. **Validates Plan JSON**
+   - Parses JSON input
+   - Validates schema (tasks array, required fields)
+   - Checks task count (max 10 enforced)
+   - Shows clear error if invalid
+
+2. **Rate Limit Check**
+   - Requires 100+ API calls remaining
+   - Circuit breaker prevents API exhaustion
+   - Shows estimated API calls needed
+   - Waits if close to limit
+
+3. **Creates/Assigns Milestone** (optional)
+   - Creates milestone if `create_milestone: true`
+   - Assigns all issues to milestone
+   - Uses `milestone_title` or extracts from plan
+   - Idempotent (reuses existing)
+
+4. **Generates GitHub Issues** (max 10)
+   - Creates issue for each task
+   - Sets title, description, acceptance criteria
+   - Assigns labels based on task metadata
+   - Links dependencies (`Depends on #123`)
+   - Adds to project board in "Ready" status
+
+5. **Label Assignment** (automatic)
+   - `claude-code` (all issues)
+   - `status:ready` (all issues)
+   - `type:*` (feature/fix/docs/refactor/test)
+   - `platform:*` (web/mobile/fullstack)
+   - `priority:*` (critical/high/medium/low)
+
+6. **Dependency Linking**
+   - Parses `dependencies` array
+   - Adds "Depends on #N" to description
+   - Creates GitHub task lists
+   - Shows blocking issues clearly
+
+7. **Project Board Sync**
+   - Adds all issues to project
+   - Sets Status field to "Ready"
+   - Uses GraphQL for efficiency
+   - Handles bulk operations
+
+8. **Summary Report**
+   - Shows created issues with links
+   - Shows milestone info
+   - Shows project board link
+   - Provides next steps
+
+#### Example Usage
+
+**Simple plan (3 tasks)**:
+```json
 {
-  "milestone": {...},
+  "milestone": "Sprint 1 - Authentication",
+  "tasks": [
+    {
+      "title": "Add login endpoint",
+      "description": "Create POST /api/auth/login endpoint with JWT token generation",
+      "acceptanceCriteria": [
+        "Accepts email and password",
+        "Returns JWT token on success",
+        "Returns 401 on invalid credentials"
+      ],
+      "type": "feature",
+      "platform": "web",
+      "priority": "high",
+      "dependencies": []
+    },
+    {
+      "title": "Add user authentication middleware",
+      "description": "Create Express middleware to validate JWT tokens",
+      "acceptanceCriteria": [
+        "Validates JWT signature",
+        "Attaches user object to request",
+        "Returns 401 on invalid token"
+      ],
+      "type": "feature",
+      "platform": "web",
+      "priority": "high",
+      "dependencies": [1]
+    },
+    {
+      "title": "Add logout endpoint",
+      "description": "Create POST /api/auth/logout endpoint",
+      "acceptanceCriteria": [
+        "Invalidates JWT token",
+        "Returns 200 on success"
+      ],
+      "type": "feature",
+      "platform": "web",
+      "priority": "medium",
+      "dependencies": [1, 2]
+    }
+  ]
+}
+```
+
+**Trigger via GitHub Actions**:
+```bash
+# Save plan to file
+cat > plan.json << EOF
+{
+  "milestone": "Sprint 1",
   "tasks": [...]
 }
 EOF
 
 # Trigger workflow
 gh workflow run claude-plan-to-issues.yml \
-  -f plan_json="$(cat plan.json)"
-
-# Monitor progress
-gh run watch
-
-# View created issues
-gh issue list --label claude-code --limit 10
+  -f plan_json="$(cat plan.json)" \
+  -f milestone_title="Sprint 1" \
+  -f create_milestone=true
 ```
 
-### Rate Limiting
+**Or use the `/plan-to-issues` slash command**:
+```bash
+/plan-to-issues plan.json
+```
 
-The workflow includes circuit breaker logic:
-- Checks remaining API calls (needs 50+)
-- Sleeps between operations
-- Retries on transient failures
+#### Configuration
 
-### Troubleshooting
+**JSON Schema** (required fields):
+```typescript
+interface ClaudePlan {
+  milestone?: string;
+  tasks: Task[];  // Max 10
+}
 
-**Error**: "Too many tasks (max 10)"
-- Split plan into multiple smaller plans
-- Prioritize most important tasks
+interface Task {
+  title: string;  // Required
+  description: string;  // Required
+  acceptanceCriteria: string[];  // Required
+  type: 'feature' | 'fix' | 'docs' | 'refactor' | 'test';  // Required
+  platform: 'web' | 'mobile' | 'fullstack';  // Required
+  priority: 'critical' | 'high' | 'medium' | 'low';  // Required
+  dependencies?: number[];  // Optional, array of task indices
+}
+```
 
-**Error**: "Invalid JSON format"
-- Validate JSON: `cat plan.json | jq .`
-- Check required fields
-- Ensure proper escaping
+**Required repository secrets**:
+```
+PROJECT_URL=https://github.com/users/USERNAME/projects/1
+```
 
-**Error**: "Project board not found"
-- Verify PROJECT_URL secret
-- Test access: `gh project view NUMBER --owner @me`
+#### Task Limit (Max 10)
 
-**Error**: "Rate limit exceeded"
-- Wait for rate limit reset
-- Reduce API calls
-- Use /kill-switch if urgent
+**Why 10?**
+- Prevents overwhelming GitHub API
+- Encourages focused sprint planning
+- Ensures manageable scope
+- Allows room for manual issues
+
+**If you have >10 tasks**:
+1. Break plan into multiple sprints/milestones
+2. Prioritize most critical tasks first
+3. Run workflow multiple times with different subsets
+4. Create remaining tasks manually
+
+#### Troubleshooting
+
+**Problem**: `❌ Invalid JSON format`
+
+**Solution**: Validate JSON syntax:
+```bash
+# Validate locally
+cat plan.json | jq .
+
+# If error, fix JSON syntax
+# Common issues: missing commas, trailing commas, unquoted keys
+```
 
 ---
 
-## Workflow 6: create-branch-on-issue.yml
+**Problem**: `❌ Too many tasks (limit: 10)`
 
-**Purpose**: Automatically creates feature branches when issues are marked ready.
+**Solution**: Split into multiple plans:
+```json
+// plan-part1.json (tasks 1-10)
+{
+  "milestone": "Sprint 1 - Part 1",
+  "tasks": [...]  // First 10 tasks
+}
 
-### Trigger
+// plan-part2.json (tasks 11-20)
+{
+  "milestone": "Sprint 1 - Part 2",
+  "tasks": [...]  // Next 10 tasks
+}
+```
+
+---
+
+**Problem**: `❌ Missing required field: type`
+
+**Solution**: Ensure all tasks have required fields:
+```json
+{
+  "title": "My task",  // ✅ Required
+  "description": "Details",  // ✅ Required
+  "acceptanceCriteria": ["..."],  // ✅ Required
+  "type": "feature",  // ✅ Required
+  "platform": "web",  // ✅ Required
+  "priority": "high"  // ✅ Required
+}
+```
+
+---
+
+**Problem**: `⚠️ Rate limit low (10 remaining)`
+
+**Solution**: Wait and retry:
+```bash
+# Check rate limit
+gh api rate_limit
+
+# Wait for reset (shown in response)
+# Then retry workflow
+```
+
+---
+
+**Problem**: `❌ PROJECT_URL not set`
+
+**Solution**: Set project board URL secret:
+```bash
+gh secret set PROJECT_URL
+# Paste: https://github.com/users/USERNAME/projects/1
+```
+
+---
+
+#### Best Practices
+
+✅ **DO**:
+- Keep tasks focused and atomic
+- Write clear acceptance criteria
+- Set appropriate priorities
+- Link dependencies correctly
+- Use meaningful task titles
+- Stay under 10 tasks per plan
+
+❌ **DON'T**:
+- Create duplicate issues (workflow checks)
+- Exceed 10 tasks (hard limit)
+- Use invalid types/platforms
+- Forget acceptance criteria
+- Skip priority assignment
+
+---
+
+### 6. create-branch-on-issue.yml
+
+**Auto-create feature branches from labeled issues**
+
+#### Purpose
+
+Automatically creates properly-named feature branches when issues are marked as ready to work on, streamlining the development workflow.
+
+#### Trigger
 
 ```yaml
 on:
   issues:
-    types: [labeled]
+    types:
+      - labeled
 ```
 
-**When it runs**: Every time a label is added to an issue.
+**Triggers when**: An issue receives ANY label. Workflow then checks if BOTH required labels are present.
 
-### What It Does
-
-1. **Checks Labels**
-   - Requires BOTH:
-     - `claude-code` label
-     - `status:ready` label
-   - Skips if either missing
-
-2. **Generates Branch Name**
-   - Format: `{type}/issue-{number}-{slug}`
-   - Types: `feature`, `fix`, `hotfix`, `refactor`, `test`, `docs`
-   - Slug: Kebab-case from issue title (max 50 chars)
-   - Example: `feature/issue-123-add-user-login`
-
-3. **Detects Base Branch**
-   - Default: `dev`
-   - Fallback: `main` (if dev doesn't exist)
-   - Configurable via label: `base:staging`
-
-4. **Creates Branch**
-   - Checks if branch already exists
-   - Creates from base branch
-   - Pushes to origin
-
-5. **Updates Issue**
-   - Comments with branch name
-   - Provides checkout instructions
-   - Links to branch on GitHub
-
-6. **Updates Project Board**
-   - Changes Status to "In Progress"
-   - Uses GraphQL mutation
-
-### Branch Naming Examples
-
-| Issue Title | Type | Branch Name |
-|-------------|------|-------------|
-| "Add user login" | feature | `feature/issue-1-add-user-login` |
-| "Fix CORS error" | fix | `fix/issue-2-fix-cors-error` |
-| "Urgent security patch" | hotfix | `hotfix/issue-3-urgent-security-patch` |
-
-### Issue Comment
-
-```markdown
-🌿 Branch created: `feature/issue-123-add-user-login`
-
-**Checkout locally**:
-\```bash
-git fetch origin
-git checkout feature/issue-123-add-user-login
-\```
-
-**View on GitHub**: [Branch link]
-
-**Next steps**:
-1. Make your changes
-2. Commit with conventional format
-3. Push to origin
-4. Create PR to dev
-```
-
-### Permissions
+#### Permissions
 
 ```yaml
 permissions:
   contents: write
   issues: write
-  projects: write
+  pull-requests: read
 ```
 
-### Configuration
+#### What It Does
 
-No configuration needed. Behavior controlled by labels.
+1. **Label Validation**
+   - Checks if issue has BOTH `claude-code` AND `status:ready` labels
+   - Skips if either label missing
+   - Skips if issue already has an associated branch
 
-### Idempotency
+2. **Type Detection** (from labels)
+   - Looks for `type:*` label
+   - Determines branch prefix: `feature/`, `fix/`, `hotfix/`, etc.
+   - Defaults to `feature/` if no type label
 
-Safe to re-run:
-- Skips if branch exists
-- Updates comment instead
-- No duplicate branches
+3. **Base Branch Detection**
+   - Default: `dev` branch
+   - Fallback: `main` if dev doesn't exist
+   - Custom: Issue can have `base:staging` or `base:main` label
+   - Validates base branch exists
 
-### Troubleshooting
+4. **Branch Name Generation**
+   - Format: `{type}/issue-{number}-{slug}`
+   - Example: `feature/issue-123-add-user-authentication`
+   - Slug: Kebab-case from issue title (max 50 chars)
+   - Sanitized: Removes special characters
 
-**Issue**: Branch not created
-- Check BOTH labels present: `claude-code` AND `status:ready`
-- View workflow run: `gh run list --workflow=create-branch-on-issue.yml`
-- Check logs: `gh run view [RUN_ID] --log`
+5. **Branch Creation**
+   - Creates branch from base branch HEAD
+   - Uses GitHub API (not git commands)
+   - Idempotent: Skips if branch exists
+   - Fails gracefully on errors
 
-**Issue**: Wrong branch name
-- Type detected from issue labels (`type:feature`, etc.)
-- Default: `feature` if no type label
+6. **Issue Comment**
+   - Posts helpful instructions to issue
+   - Includes branch name
+   - Includes checkout command
+   - Includes PR creation command
 
-**Issue**: Branch already exists
-- Workflow skips creation
-- Updates issue comment instead
-- Delete branch to retry: `git push origin --delete feature/issue-N-name`
+7. **Project Board Update**
+   - Updates issue status to "In Progress"
+   - Uses GraphQL for efficiency
+   - Handles missing project gracefully
+
+#### Example Usage
+
+**Scenario: Issue created from plan**
+
+1. Issue #123 created: "Add user authentication"
+2. Labels automatically applied: `claude-code`, `status:ready`, `type:feature`, `platform:web`
+3. Workflow triggers automatically
+4. Branch created: `feature/issue-123-add-user-authentication`
+5. Comment posted to issue with instructions
+
+**Manual scenario**:
+
+```bash
+# Create issue
+gh issue create \
+  --title "Fix navigation bug" \
+  --body "Navigation crashes on mobile" \
+  --label "type:fix" \
+  --label "platform:mobile"
+
+# Add required labels to trigger branch creation
+gh issue edit 123 \
+  --add-label "claude-code" \
+  --add-label "status:ready"
+
+# Branch automatically created: fix/issue-123-fix-navigation-bug
+```
+
+#### Configuration
+
+**Branch naming patterns**:
+
+| Type Label | Branch Prefix | Example |
+|------------|---------------|---------|
+| `type:feature` | `feature/` | `feature/issue-123-add-auth` |
+| `type:fix` | `fix/` | `fix/issue-456-resolve-crash` |
+| `type:hotfix` | `hotfix/` | `hotfix/issue-789-security-patch` |
+| `type:refactor` | `refactor/` | `refactor/issue-101-clean-code` |
+| `type:docs` | `docs/` | `docs/issue-202-update-readme` |
+| `type:test` | `test/` | `test/issue-303-add-unit-tests` |
+
+**Base branch detection** (in order):
+
+1. Check for `base:*` label (e.g., `base:staging`)
+2. Try `dev` branch
+3. Fall back to `main` branch
+
+**Custom base branch**:
+```bash
+# Force branch to be created from staging
+gh issue edit 123 --add-label "base:staging"
+```
+
+#### Checkout Instructions
+
+After branch is created, the bot comments:
+
+```markdown
+## 🎉 Branch Created!
+
+Your branch is ready: `feature/issue-123-add-user-authentication`
+
+### Get Started
+
+```bash
+# Fetch and checkout the branch
+git fetch origin
+git checkout feature/issue-123-add-user-authentication
+
+# Or create and track in one command
+git checkout -b feature/issue-123-add-user-authentication origin/feature/issue-123-add-user-authentication
+
+# Start working!
+```
+
+### When Ready
+
+```bash
+# Commit your changes
+git add .
+git commit -m "feat(auth): implement user authentication"
+
+# Push to remote
+git push origin feature/issue-123-add-user-authentication
+
+# Create PR
+gh pr create --base dev --fill
+```
+
+**Remember to link this issue in your PR description!**
+```
+
+#### Troubleshooting
+
+**Problem**: Branch not created after labeling
+
+**Solution**: Check both required labels are present:
+```bash
+# View issue labels
+gh issue view 123
+
+# Should show BOTH:
+# - claude-code
+# - status:ready
+
+# Add missing label
+gh issue edit 123 --add-label "claude-code"
+gh issue edit 123 --add-label "status:ready"
+```
 
 ---
 
-## Workflow 7: pr-status-sync.yml
+**Problem**: `❌ Base branch 'dev' not found`
 
-**Purpose**: Syncs PR lifecycle events with linked issue statuses and project board.
+**Solution**: Create dev branch or use main:
+```bash
+# Option 1: Create dev branch
+git checkout -b dev main
+git push origin dev
 
-### Trigger
+# Option 2: Use main as base
+gh issue edit 123 --add-label "base:main"
+# Then remove and re-add status:ready to retrigger
+gh issue edit 123 --remove-label "status:ready"
+gh issue edit 123 --add-label "status:ready"
+```
+
+---
+
+**Problem**: Branch name too long or weird characters
+
+**Solution**: This is automatic slug generation. The workflow:
+- Limits slug to 50 characters
+- Removes special characters
+- Converts spaces to hyphens
+- Lowercases everything
+
+If you need a different name, create branch manually:
+```bash
+git checkout -b feature/custom-name
+git push origin feature/custom-name
+```
+
+---
+
+**Problem**: `❌ Branch already exists`
+
+**Solution**: This is normal - workflow is idempotent. The branch was already created. Just checkout:
+```bash
+git fetch origin
+git checkout feature/issue-123-whatever
+```
+
+---
+
+#### Best Practices
+
+✅ **DO**:
+- Use type labels for proper branch naming
+- Wait for auto-branch creation (saves time)
+- Follow the checkout instructions from bot comment
+- Link issue in PR description
+
+❌ **DON'T**:
+- Create branches manually (defeats automation)
+- Rename auto-created branches (breaks tracking)
+- Remove `claude-code` label (breaks workflow)
+- Work directly on dev/main branches
+
+---
+
+### 7. pr-status-sync.yml
+
+**Sync PR lifecycle events with linked issues**
+
+#### Purpose
+
+Automatically updates issue status and project board as pull requests move through their lifecycle (opened, review, merged, closed).
+
+#### Trigger
 
 ```yaml
 on:
   pull_request:
-    types: [opened, closed, converted_to_draft, reopened]
+    types:
+      - opened
+      - closed
+      - converted_to_draft
+      - ready_for_review
+      - reopened
+    branches:
+      - dev
+
   pull_request_review:
-    types: [submitted]
+    types:
+      - submitted
+    branches:
+      - dev
 ```
 
-**When it runs**: On every PR event (open, close, draft, review, etc.)
+**Triggers when**: PR events occur on PRs targeting `dev` branch.
 
-### What It Does
-
-1. **Extracts Linked Issues**
-   - Parses PR body for issue references
-   - Supports: `Closes #N`, `Fixes #N`, `Resolves #N`
-   - Handles multiple issues: `Closes #1, #2, #3`
-
-2. **Updates Issue Status**
-   - **PR opened (ready_for_review)** → Issues to "In Review"
-   - **PR converted to draft** → Issues to "In Progress"
-   - **PR merged to dev** → Issues to "To Deploy"
-   - **PR closed (not merged)** → Issues to "In Progress"
-
-3. **Updates Project Board**
-   - Uses GraphQL API
-   - Updates Status field
-   - Syncs all linked issues
-
-4. **Branch Cleanup**
-   - Deletes source branch after merge
-   - Only for feature/fix/hotfix branches
-   - Never deletes main/dev/staging
-
-5. **Debouncing**
-   - 10-second window prevents loops
-   - Skips if same event occurred recently
-   - Prevents infinite triggers
-
-### Status Transitions
-
-| Event | Issue Status | PR Status |
-|-------|-------------|-----------|
-| PR opened (ready) | **In Review** | Open |
-| PR converted to draft | **In Progress** | Draft |
-| Approval submitted | **In Review** | Approved |
-| PR merged to dev | **To Deploy** | Merged |
-| PR closed (not merged) | **In Progress** | Closed |
-
-### Permissions
+#### Permissions
 
 ```yaml
 permissions:
-  contents: write      # For branch deletion
-  pull-requests: read
+  contents: write
+  pull-requests: write
   issues: write
-  projects: write
 ```
 
-### Debouncing Logic
+#### Concurrency Control
 
-```javascript
-// Pseudo-code
-if (event_occurred_within_last_10_seconds(event_key)) {
-  skip_processing()
-} else {
-  process_event()
-  record_timestamp(event_key)
-}
+```yaml
+concurrency:
+  group: pr-sync-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 ```
 
-This prevents infinite loops from:
-- Rapid label changes
-- Simultaneous PR updates
-- Cascading automations
+**Prevents**: Multiple syncs running simultaneously for same PR.
 
-### Linked Issue Extraction
+#### What It Does
 
-**Supported Formats**:
+1. **Fork Safety Check**
+   - Detects fork PRs
+   - Skips write operations for security
+   - Allows read-only checks
+
+2. **Extract Linked Issues**
+   - Parses PR body for issue references
+   - Finds: `Closes #123`, `Fixes #456`, `Resolves #789`, `Relates to #101`
+   - Deduplicates issue numbers
+   - Skips if no linked issues
+
+3. **Debounce Delay** (10 seconds)
+   - Prevents infinite automation loops
+   - Waits before making changes
+   - Allows other workflows to settle
+
+4. **Determine Target Status** (based on PR state)
+   - **PR opened (ready)** → Issues: "In Review"
+   - **PR converted to draft** → Issues: "In Progress"
+   - **PR merged** → Issues: "To Deploy"
+   - **PR closed (not merged)** → Issues: "In Progress"
+
+5. **Update Issue Status**
+   - Posts comment to issues about PR status change
+   - Updates labels (if configured)
+   - Updates project board status
+   - Handles multiple linked issues
+
+6. **Delete Merged Branch** (optional)
+   - Deletes source branch after merge
+   - Protects main branches (main, dev, staging)
+   - Posts comment to PR confirming deletion
+
+7. **Project Board Sync**
+   - Syncs all linked issues to project
+   - Updates Status field via GraphQL
+   - Handles missing project gracefully
+
+8. **Summary Report**
+   - Shows updated issues
+   - Shows branch deletion status
+   - Shows project sync status
+
+#### Status Transition Logic
+
+```
+PR Draft → Issues: "In Progress"
+    ↓
+PR Ready for Review → Issues: "In Review"
+    ↓
+PR Merged → Issues: "To Deploy" + Delete Branch
+    ↓
+(Later: main merge) → Issues: "Done" (via release-status-sync)
+
+PR Closed (not merged) → Issues: "In Progress"
+    ↓
+PR Reopened → Issues: "In Review"
+```
+
+#### Example Usage
+
+**Scenario 1: Feature PR lifecycle**
+
+```bash
+# Day 1: Create draft PR
+gh pr create \
+  --draft \
+  --title "feat(auth): Add user authentication" \
+  --body "Closes #123"
+
+# → Workflow runs
+# → Issue #123 status: "In Progress" (draft PR)
+
+# Day 2: Mark ready for review
+gh pr ready
+
+# → Workflow runs
+# → Issue #123 status: "In Review"
+# → Issue #123 comment: "PR ready for review"
+
+# Day 3: PR approved and merged
+gh pr merge --squash
+
+# → Workflow runs
+# → Issue #123 status: "To Deploy"
+# → Branch deleted: feature/issue-123-add-auth
+# → Issue #123 comment: "PR merged to dev"
+```
+
+**Scenario 2: PR closed without merge**
+
+```bash
+# Close PR
+gh pr close 456
+
+# → Workflow runs
+# → Linked issues status: "In Progress"
+# → Issue comment: "PR closed without merging"
+# → Branch NOT deleted (can reopen)
+```
+
+#### Configuration
+
+**Enable/disable branch deletion**:
+
+Edit `.github/workflows/pr-status-sync.yml`:
+```yaml
+delete-merged-branch:
+  if: |-
+    always() &&
+    needs.fork-check.outputs.should-skip-writes != 'true' &&
+    github.event.pull_request.merged == true
+    && false  # ← Add this to disable
+```
+
+**Protected branches** (never deleted):
+```yaml
+protected_branches:
+  - main
+  - master
+  - dev
+  - develop
+  - staging
+  - production
+```
+
+**Adjust debounce delay**:
+```yaml
+- name: Wait 10 seconds to debounce automation loops
+  run: sleep 10  # ← Change to 5, 15, 20, etc.
+```
+
+#### Troubleshooting
+
+**Problem**: Status not updating after PR merge
+
+**Solution**: Check for linked issues in PR body:
 ```markdown
+# PR body must contain:
 Closes #123
-Fixes #456, #789
-Resolves #100
-
-This PR closes #200 and fixes #300.
+# or
+Fixes #456
+# or
+Resolves #789
 ```
 
-**Regex Pattern**:
-```regex
-(Closes|Fixes|Resolves)\s+#(\d+)
-```
-
-### Fork Safety
-
-For fork PRs:
-- Runs checks ✅
-- Skips write operations ✅
-- No branch deletion ✅
-- No status updates ✅
-
-### Troubleshooting
-
-**Issue**: Status not updating
-- Check linked issues in PR body
-- Verify format: `Closes #N`
-- Check workflow logs: `gh run view --log`
-- Check 10-second debounce window
-
-**Issue**: Multiple issues not updating
-- Ensure format: `Closes #1, #2, #3`
-- Check each issue has correct labels
-- Verify project board access
-
-**Issue**: Branch not deleted
-- Only deletes feature/fix/hotfix branches
-- Waits for successful merge
-- Check branch protection rules
+If missing, edit PR description and add.
 
 ---
 
-## Workflow 8: release-status-sync.yml
+**Problem**: `⚠️ No linked issues found`
 
-**Purpose**: Closes issues and creates releases when PRs merge to main (production deployment).
+**Solution**: Edit PR description:
+```bash
+# Edit PR
+gh pr edit 456 --body "$(cat << EOF
+## Summary
+This PR adds authentication.
 
-### Trigger
+Closes #123
+Fixes #124
+EOF
+)"
+```
+
+---
+
+**Problem**: Branch not deleted after merge
+
+**Solution**: Check protected branch list. If your branch name matches a protected pattern, it won't be deleted (this is by design). For feature branches, ensure they follow `feature/*`, `fix/*`, or `hotfix/*` pattern.
+
+---
+
+**Problem**: `❌ Infinite loop detected` (rare)
+
+**Solution**: The 10-second debounce prevents this, but if it occurs:
+1. Check if multiple workflows are modifying issues simultaneously
+2. Increase debounce delay to 15-20 seconds
+3. Check webhook delivery logs in repo settings
+
+---
+
+#### Best Practices
+
+✅ **DO**:
+- Always link issues in PR description
+- Use conventional commit format for PR titles
+- Wait for automation to complete before manual updates
+- Review status changes in issue comments
+
+❌ **DON'T**:
+- Manually update issue status (automation does it)
+- Remove linked issues from PR (breaks sync)
+- Force push after PR opened (triggers re-sync)
+- Close and reopen PRs frequently (wastes API calls)
+
+---
+
+### 8. release-status-sync.yml
+
+**Close issues and create releases on production deployment**
+
+#### Purpose
+
+Automatically closes all linked issues, updates project board to "Done", and creates GitHub releases when changes are deployed to production (merged to `main`).
+
+#### Trigger
 
 ```yaml
 on:
   pull_request:
-    types: [closed]
-    branches: [main]
+    types:
+      - closed
+    branches:
+      - main
 ```
 
-**When it runs**: When a PR to main is closed.
+**Triggers when**: A PR targeting `main` is closed (checks for merge status internally).
 
-### What It Does
-
-1. **Validates Merge**
-   - Checks PR was merged (not just closed)
-   - Ensures source is `dev` branch
-   - Skips if conditions not met
-
-2. **Extracts Linked Issues**
-   - Parses PR body for issue references
-   - Same format as pr-status-sync.yml
-
-3. **Closes Issues**
-   - Closes all linked issues
-   - Adds closing comment
-   - Updates timestamps
-
-4. **Updates Project Board**
-   - Sets Status to "Done"
-   - Uses GraphQL mutation
-   - Archives completed items (optional)
-
-5. **Creates GitHub Release** (optional)
-   - Detects version from package.json
-   - Generates changelog from commits
-   - Lists closed issues
-   - Publishes release notes
-
-6. **Adds Release Comment**
-   - Comments on each closed issue
-   - Links to release
-   - Shows version number
-
-### Permissions
+#### Permissions
 
 ```yaml
 permissions:
-  contents: write      # For releases
-  pull-requests: read
+  contents: write
   issues: write
-  projects: write
+  pull-requests: read
 ```
 
-### Release Comment Format
+#### What It Does
+
+1. **Validate Release Conditions**
+   - PR must be **merged** (not just closed)
+   - PR must target **main** branch
+   - PR source should be **dev** branch (configurable)
+   - Skips if any condition fails
+
+2. **Extract Linked Issues**
+   - Parses PR body for issue references
+   - Finds: `Closes #123`, `Fixes #456`, `Resolves #789`
+   - Deduplicates issue numbers
+   - Handles multiple linked issues
+
+3. **Detect Version**
+   - Reads version from `package.json`
+   - Falls back to "unknown" if not found
+   - Uses for release tag (v{version})
+
+4. **Close Linked Issues**
+   - Closes each linked issue
+   - Skips already-closed issues
+   - Adds release comment with details
+   - Handles errors gracefully
+
+5. **Update Project Board**
+   - Updates all linked issues to "Done" status
+   - Uses GraphQL for efficiency
+   - Syncs bidirectionally
+
+6. **Create GitHub Release** (optional)
+   - Creates release tag: `v{version}`
+   - Generates release notes from commits
+   - Compares `dev...main` for changes
+   - Includes PR links and commit history
+   - Skips if version is unknown or release exists
+
+7. **Generate Summary**
+   - Lists all closed issues
+   - Shows release version
+   - Shows GitHub release link
+   - Provides congratulations message
+
+#### Release Comment Template
+
+Issues receive this comment when closed:
 
 ```markdown
-🚀 **Released to production** in [v1.2.3](release_url)
+## 🚀 Released to Production!
 
-This issue was resolved and deployed to production.
+This issue has been released to production in **v1.2.0**.
 
-**Release Date**: 2025-11-06
-**Version**: 1.2.3
-**Changelog**: [View full changelog](changelog_url)
+### 📋 Release Details
+- **Release PR:** #456
+- **Version:** 1.2.0
+- **Released at:** 2025-11-06T10:30:00Z
+- **Branch:** main
 
-Thank you for your contribution! 🎉
+### 🎉 What's Next?
+- Verify the fix/feature in production
+- Monitor for any issues
+- Close related tickets if applicable
+
+---
+🤖 _This issue was automatically closed by the release workflow_
 ```
 
-### Changelog Generation
+#### Example Usage
 
-**From commits**:
-```markdown
-## Version 1.2.3 (2025-11-06)
+**Standard release flow**:
+
+```bash
+# On dev branch - all features merged
+git checkout dev
+git pull origin dev
+
+# Create release PR
+gh pr create \
+  --base main \
+  --head dev \
+  --title "release: Version 1.2.0" \
+  --body "$(cat << EOF
+## 🚀 Release v1.2.0
 
 ### Features
-- Add user authentication (#123)
-- Implement dark mode (#145)
+- User authentication (#123)
+- Password reset (#124)
+- Profile page (#125)
 
 ### Bug Fixes
-- Fix CORS issue (#456)
-- Resolve memory leak (#478)
+- Navigation crash (#126)
+- API timeout (#127)
 
-### Closed Issues
-Closes #123, #145, #456, #478
+Closes #123
+Closes #124
+Closes #125
+Closes #126
+Closes #127
+EOF
+)"
+
+# After approval and merge:
+gh pr merge 456 --squash
+
+# → Workflow automatically:
+# → Closes issues #123-127
+# → Updates project board to "Done"
+# → Creates GitHub release v1.2.0
+# → Adds release comments to all issues
 ```
 
-### Version Detection
+**Using `/release` command**:
+```bash
+# Simplified release command
+/release
 
-**From package.json**:
+# → Prompts for version
+# → Generates changelog
+# → Creates release PR
+# → Monitors merge
+# → Triggers release-status-sync automatically
+```
+
+#### Configuration
+
+**Version detection** (in order):
+
+1. Reads `package.json` → `version` field
+2. Falls back to "unknown" if not found
+3. Can be manually specified in workflow
+
+**Customize version source**:
+
+Edit `.github/workflows/release-status-sync.yml`:
+```yaml
+- name: Detect version from package.json
+  if: [ -f "package.json" ]; then
+    VERSION=$(jq -r '.version' package.json)
+  # Add custom version detection:
+  elif [ -f "VERSION" ]; then
+    VERSION=$(cat VERSION)
+  elif git describe --tags >/dev/null 2>&1; then
+    VERSION=$(git describe --tags --abbrev=0)
+  else
+    VERSION="unknown"
+  fi
+```
+
+**Disable GitHub release creation**:
+
+Set `version` to "unknown" to skip:
+```yaml
+- name: Create GitHub release
+  if: |-
+    needs.validate-release.outputs.version != 'unknown' &&
+    needs.close-issues.result == 'success'
+    && false  # ← Add to disable
+```
+
+#### Release Notes Generation
+
+**Automatic changelog** (generated from commits):
+
+```markdown
+## 🚀 Release v1.2.0
+
+This release includes changes from PR #456.
+
+### 🎯 Changes
+- feat(auth): add user authentication (abc1234)
+- feat(auth): add password reset (def5678)
+- fix(nav): resolve navigation crash (ghi9012)
+- docs: update README (jkl3456)
+
+### 🔗 Links
+- **Release PR:** #456
+- **Full Changelog:** [Compare view](../../compare/v1.1.0...v1.2.0)
+
+---
+🤖 _Release notes generated automatically_
+```
+
+**Customize release notes**:
+
+Edit PR description with custom release notes - they'll appear in the release.
+
+#### Troubleshooting
+
+**Problem**: `⏭️ PR was closed without merging`
+
+**Solution**: This is **expected**. Only merged PRs trigger releases. If you closed by accident:
+```bash
+# Reopen PR
+gh pr reopen 456
+
+# Merge it
+gh pr merge 456 --squash
+```
+
+---
+
+**Problem**: `⚠️ Source branch is not 'dev'`
+
+**Solution**: This workflow expects `dev → main` releases. If you use a different branching strategy, edit the workflow:
+
+```yaml
+if [[ "$SOURCE_BRANCH" != "dev" ]]; then
+  echo "⚠️  Source branch is not 'dev' (got: $SOURCE_BRANCH)"
+  # Remove these lines to allow other branches:
+  # echo "is-release=false" >> $GITHUB_OUTPUT
+  # exit 0
+fi
+```
+
+Or create a separate release workflow for your branching strategy.
+
+---
+
+**Problem**: `⏭️ Release v1.2.0 already exists`
+
+**Solution**: Version has already been released. Bump version:
 ```json
+// package.json
 {
-  "version": "1.2.3"
+  "version": "1.2.1"  // ← Increment
 }
 ```
 
-**Manual input** (optional):
-Can override via workflow input if needed.
-
-### Configuration
-
-#### Enable GitHub Releases
-
-Set in workflow file:
-```yaml
-create_release: true  # Default: false
+Commit and push:
+```bash
+git add package.json
+git commit -m "chore: bump version to 1.2.1"
+git push
 ```
 
-#### Customize Release Notes
+---
 
-Add `.github/release-template.md`:
+**Problem**: Issues not closing
+
+**Solution**: Check for linked issues in release PR body:
 ```markdown
-## What's Changed
-$CHANGES
-
-## Closed Issues
-$ISSUES
-
-Full Changelog: $PREVIOUS_TAG...$CURRENT_TAG
+# Must include:
+Closes #123
+Closes #124
+Closes #125
 ```
 
-### Troubleshooting
+Edit PR description if missing:
+```bash
+gh pr edit 456 --body "Closes #123\nCloses #124"
+```
 
-**Issue**: Issues not closing
-- Check PR was merged (not just closed)
-- Verify source branch is `dev`
-- Check issue references in PR body
+---
 
-**Issue**: Release not created
-- Check `create_release: true` in workflow
-- Verify GITHUB_TOKEN permissions
-- Check version in package.json
+**Problem**: `❌ package.json not found - version unknown`
 
-**Issue**: Wrong version detected
-- Update package.json version
-- Or pass version manually
+**Solution**: This is **not an error** - release will still work, just without a version tag. To fix:
+
+**Option 1**: Add package.json:
+```bash
+npm init -y
+# Edit version
+git add package.json
+git commit -m "chore: add package.json"
+```
+
+**Option 2**: Use VERSION file:
+```bash
+echo "1.2.0" > VERSION
+git add VERSION
+git commit -m "chore: add VERSION file"
+
+# Then update workflow to read VERSION file (see Configuration)
+```
+
+---
+
+#### Best Practices
+
+✅ **DO**:
+- Always bump version before release
+- Link all issues in release PR
+- Generate changelog
+- Test release flow in staging first
+- Monitor production after release
+- Document breaking changes
+
+❌ **DON'T**:
+- Merge to main from feature branches (use dev)
+- Skip version bumps
+- Close PRs instead of merging
+- Forget to link issues
+- Rush releases without testing
+
+---
+
+## Workflow Relationships
+
+### Dependency Graph
+
+```
+bootstrap.yml (one-time setup)
+    ↓
+    ├─→ Labels created
+    ├─→ Project validated
+    └─→ Secrets validated
+         ↓
+         └─→ claude-plan-to-issues.yml
+              ↓
+              ├─→ Creates issues (max 10)
+              ├─→ Assigns labels
+              └─→ Adds to project board
+                   ↓
+                   └─→ create-branch-on-issue.yml
+                        ↓
+                        └─→ Auto-creates branches
+                             ↓
+                             └─→ Developer works on branch
+                                  ↓
+                                  └─→ Creates PR to dev
+                                       ↓
+                                       ├─→ pr-into-dev.yml (validation)
+                                       │    └─→ reusable-pr-checks.yml
+                                       │
+                                       └─→ pr-status-sync.yml (lifecycle)
+                                            ↓
+                                            └─→ PR merged to dev
+                                                 ↓
+                                                 └─→ Create release PR (dev → main)
+                                                      ↓
+                                                      ├─→ dev-to-main.yml (release gates)
+                                                      │
+                                                      └─→ PR merged to main
+                                                           ↓
+                                                           └─→ release-status-sync.yml
+                                                                ↓
+                                                                ├─→ Closes issues
+                                                                ├─→ Updates project
+                                                                └─→ Creates release
+```
+
+### Workflow Interaction Matrix
+
+| Workflow | Triggers | Depends On | Modifies |
+|----------|----------|------------|----------|
+| bootstrap.yml | Manual | None | Labels, secrets validation |
+| reusable-pr-checks.yml | Called | None | PR status checks |
+| pr-into-dev.yml | PR opened to dev | reusable-pr-checks | PR status, comments |
+| dev-to-main.yml | PR opened to main | None | PR status, artifacts |
+| claude-plan-to-issues.yml | Manual | bootstrap | Issues, project board, milestone |
+| create-branch-on-issue.yml | Issue labeled | bootstrap | Branches, issue comments, project |
+| pr-status-sync.yml | PR events | None | Issues, project board, branches |
+| release-status-sync.yml | PR merged to main | None | Issues, project board, releases |
 
 ---
 
 ## Best Practices
 
-### 1. Always Link Issues to PRs
+### 1. Setup Phase
 
-**Why**: Enables automatic status tracking
+✅ **DO**:
+- Run `bootstrap.yml` first thing
+- Validate all secrets are set
+- Create project board with Status field
+- Test with one issue before bulk import
 
-**How**:
-```markdown
-Closes #123
+❌ **DON'T**:
+- Skip bootstrap (creates missing labels)
+- Forget to set PROJECT_URL secret
+- Use classic projects (must be Projects v2)
 
-## Summary
-My changes...
+### 2. Planning Phase
+
+✅ **DO**:
+- Keep plans to 10 tasks max
+- Write clear acceptance criteria
+- Set appropriate priorities
+- Link task dependencies
+- Use meaningful task titles
+
+❌ **DON'T**:
+- Exceed 10 tasks per plan (hard limit)
+- Skip acceptance criteria
+- Use vague descriptions
+- Forget to assign types/platforms
+
+### 3. Development Phase
+
+✅ **DO**:
+- Wait for auto-branch creation
+- Follow conventional commit format
+- Link issues in every PR
+- Run quality checks locally first
+- Keep PRs small and focused
+
+❌ **DON'T**:
+- Create branches manually
+- Skip linking issues
+- Merge failing PRs
+- Work directly on dev/main
+
+### 4. Review Phase
+
+✅ **DO**:
+- Address all quality check failures
+- Respond to PR review comments
+- Update PR when requirements change
+- Keep PR description current
+
+❌ **DON'T**:
+- Override failing checks
+- Force push after reviews
+- Ignore security warnings
+- Merge without approval
+
+### 5. Release Phase
+
+✅ **DO**:
+- Bump version before release
+- Generate comprehensive changelog
+- Test in staging first
+- Monitor production deployment
+- Document breaking changes
+
+❌ **DON'T**:
+- Rush releases
+- Skip smoke tests
+- Merge hotfixes to main directly
+- Forget to close old milestones
+
+---
+
+## Common Customizations
+
+### 1. Adjust Task Limit
+
+**Change max 10 to max 15**:
+
+Edit `.github/workflows/claude-plan-to-issues.yml`:
+```yaml
+- name: Validate plan
+  run: |
+    TASK_COUNT=$(echo "$PLAN_JSON" | jq '.tasks | length')
+    if [ "$TASK_COUNT" -gt 15 ]; then  # ← Change from 10
+      echo "❌ Too many tasks: $TASK_COUNT (max: 15)"
+      exit 1
+    fi
 ```
 
-### 2. Use Conventional Commits
+**Note**: Higher limits consume more API calls.
 
-**Why**: Enables automated changelogs
+---
 
-**Format**: `type(scope): description`
+### 2. Change Branch Naming
 
-**Examples**:
-- `feat: add user login`
-- `fix(api): resolve CORS issue`
-- `docs: update README`
+**Add custom prefixes**:
 
-### 3. Run Bootstrap Once
-
-**When**: Immediately after cloning blueprint
-
-**Command**:
-```bash
-gh workflow run bootstrap.yml
+Edit `.github/workflows/create-branch-on-issue.yml`:
+```yaml
+case "$ISSUE_TYPE" in
+  "type:feature") BRANCH_PREFIX="feature" ;;
+  "type:fix") BRANCH_PREFIX="fix" ;;
+  "type:enhancement") BRANCH_PREFIX="enhance" ;;  # ← Add custom
+  "type:experimental") BRANCH_PREFIX="exp" ;;     # ← Add custom
+  *) BRANCH_PREFIX="feature" ;;
+esac
 ```
 
-### 4. Test Locally Before Pushing
+---
 
-**Recommended**:
-```bash
-pnpm lint
-pnpm type-check
-pnpm test
-pnpm build
+### 3. Disable Branch Deletion
+
+**Keep branches after merge**:
+
+Edit `.github/workflows/pr-status-sync.yml`:
+```yaml
+delete-merged-branch:
+  if: |-
+    false  # ← Disable completely
 ```
 
-This catches issues before CI runs.
-
-### 5. Monitor Workflow Runs
-
-**Commands**:
-```bash
-# List recent runs
-gh run list --limit 10
-
-# Watch current run
-gh run watch
-
-# View logs
-gh run view --log
+Or keep branches for specific types:
+```yaml
+- name: Delete source branch
+  run: |
+    # Don't delete hotfix branches (for audit trail)
+    if [[ "$BRANCH_NAME" == hotfix/* ]]; then
+      echo "Keeping hotfix branch for audit"
+      exit 0
+    fi
 ```
 
-### 6. Use Draft PRs for WIP
+---
 
-**Why**: Keeps issues in "In Progress" until ready
+### 4. Add Slack Notifications
 
-**How**:
-```bash
-gh pr create --draft
-# Work on changes
-gh pr ready  # When ready for review
+**Notify on releases**:
+
+Add to `.github/workflows/release-status-sync.yml`:
+```yaml
+- name: Notify Slack
+  uses: slackapi/slack-github-action@v1
+  with:
+    webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+    payload: |
+      {
+        "text": "🚀 Released v${{ needs.validate-release.outputs.version }} to production!",
+        "blocks": [
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "Released <https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate-release.outputs.version }}|v${{ needs.validate-release.outputs.version }}>"
+            }
+          }
+        ]
+      }
 ```
 
-### 7. Keep Branches Short-Lived
+---
 
-**Best Practice**: Merge within 1-2 days
+### 5. Custom Quality Checks
 
-**Why**:
-- Reduces merge conflicts
-- Faster feedback
-- Easier code review
+**Add performance tests**:
 
-### 8. Use /kill-switch for Emergencies
+Edit `.github/workflows/reusable-pr-checks.yml`:
+```yaml
+performance-tests:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup-node-pnpm
 
-**When**: Workflows causing issues
+    - name: Run performance tests
+      run: pnpm run test:perf
 
-**Command**:
-```bash
-/kill-switch enable
-# Fix the issue
-/kill-switch disable
+    - name: Check bundle size
+      run: |
+        BUNDLE_SIZE=$(du -sh dist | cut -f1)
+        echo "Bundle size: $BUNDLE_SIZE"
+        # Add size limit check here
 ```
+
+---
+
+### 6. Multi-Environment Support
+
+**Add staging environment**:
+
+Create `.github/workflows/dev-to-staging.yml`:
+```yaml
+# Copy from dev-to-main.yml
+# Change:
+# - branches: main → branches: staging
+# - Adjust quality gates as needed
+```
+
+Create `.github/workflows/staging-to-main.yml`:
+```yaml
+# Minimal final checks before production
+```
+
+Update pr-status-sync and release-status-sync for new flow.
 
 ---
 
 ## Troubleshooting
 
-For detailed troubleshooting of specific workflows, see:
+### General Debugging
 
-- **[Setup Issues](TROUBLESHOOTING.md#setup-issues)** - Bootstrap and configuration
-- **[Workflow Failures](TROUBLESHOOTING.md#workflow-failures)** - General workflow issues
-- **[Branch and PR Issues](TROUBLESHOOTING.md#branch-and-pr-issues)** - PR and branch automation
-- **[Project Board Sync](TROUBLESHOOTING.md#project-board-sync-issues)** - Status sync problems
-
-### Quick Diagnostics
-
+**View workflow run logs**:
 ```bash
-# Check workflow status
-gh workflow list
-
-# View recent runs
+# List recent runs
 gh run list --limit 10
 
-# Check specific workflow
-gh run list --workflow=[NAME] --limit 5
+# View specific run
+gh run view 1234567890
 
-# View logs
-gh run view [RUN_ID] --log
+# Watch live
+gh run watch 1234567890
+```
 
-# Check secrets
-gh secret list
-
-# Test project access
-gh project view NUMBER --owner @me
-
-# Check rate limit
+**Check rate limit**:
+```bash
 gh api rate_limit
 ```
 
-### Common Issues
+**View repository secrets**:
+```bash
+gh secret list
+```
 
-1. **"Workflow not triggering"**
-   - Check trigger conditions
-   - Verify branch names
-   - Check file paths
+**Test workflow locally** (using act):
+```bash
+# Install act
+brew install act
 
-2. **"Rate limit exceeded"**
-   - Wait for reset
-   - Use /kill-switch
-   - Reduce frequency
-
-3. **"Permission denied"**
-   - Check token permissions
-   - Verify secret access
-   - Check branch protections
-
-4. **"Infinite loop detected"**
-   - Check debouncing (10-second window)
-   - Review workflow triggers
-   - Use /kill-switch
+# Run bootstrap workflow
+act workflow_dispatch -W .github/workflows/bootstrap.yml
+```
 
 ---
 
-## Additional Resources
+### Common Error Patterns
 
-- **[Quick Start Guide](QUICK_START.md)** - Get started in 5 minutes
-- **[Complete Setup Guide](COMPLETE_SETUP.md)** - Detailed configuration
-- **[Commands Reference](COMMANDS.md)** - All 8 slash commands
-- **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Comprehensive solutions
-- **[Customization Guide](CUSTOMIZATION.md)** - Advanced configuration
-- **[Architecture Guide](ARCHITECTURE.md)** - System design
+**`Error: Resource not accessible by integration`**
+
+**Cause**: Insufficient permissions in workflow.
+
+**Solution**: Check `permissions:` block matches workflow needs:
+```yaml
+permissions:
+  contents: write  # For creating branches
+  issues: write    # For updating issues
+  pull-requests: write  # For PR comments
+```
 
 ---
 
-**Questions?** Open an issue with the `question` label or check [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+**`Error: GraphQL: Field 'Status' doesn't exist on type 'ProjectV2'`**
 
-**Found a bug?** Open an issue with the `bug` label and include workflow logs.
+**Cause**: Project board doesn't have a Status field.
+
+**Solution**: Add Status field to your project board:
+1. Open project board → Settings
+2. Fields → New field → Single select
+3. Name: "Status"
+4. Add options: Ready, In Progress, In Review, To Deploy, Done
+
+---
+
+**`Error: API rate limit exceeded`**
+
+**Cause**: Too many API calls in short time.
+
+**Solution**:
+1. Wait for rate limit reset (check `gh api rate_limit`)
+2. Reduce workflow frequency
+3. Increase debounce delays
+4. Consider GitHub Enterprise (higher limits)
+
+---
+
+**`Error: Reference does not exist`**
+
+**Cause**: Trying to create branch from non-existent base.
+
+**Solution**: Ensure base branch exists:
+```bash
+# Check branches
+git branch -a
+
+# Create missing branch
+git checkout -b dev main
+git push origin dev
+```
+
+---
+
+### Workflow-Specific Issues
+
+See individual workflow documentation above for specific troubleshooting scenarios.
+
+### Getting Help
+
+1. **Check workflow logs** - Most errors have clear messages
+2. **Review this documentation** - Most issues are covered
+3. **Search GitHub Issues** - Others may have same problem
+4. **Open discussion** - Community can help
+5. **File bug report** - If you find a real issue
+
+---
+
+---
+
+## Next Steps
+
+✅ **Workflows documented!** You now understand all 8 automation workflows.
+
+**Continue Learning**:
+- [Slash Commands Reference](./COMMANDS.md) - 8 interactive commands
+- [Customization Guide](./CUSTOMIZATION.md) - Advanced configuration
+- [Architecture Deep Dive](./ARCHITECTURE.md) - System design and decisions
+
+**Get Started**:
+1. Run `/blueprint-init` to set up your repository
+2. Create your first plan with Claude Code
+3. Run `/plan-to-issues` to create issues
+4. Start working - branches auto-create!
+
+---
+
+**Document Version**: 1.0.0
+**Last Updated**: 2025-11-06
+**Workflows Version**: Phase 1 Complete
