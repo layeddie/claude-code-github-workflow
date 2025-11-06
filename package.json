@@ -1,0 +1,29 @@
+{
+  "name": "claudecode-github-bluprint",
+  "version": "1.0.0",
+  "description": "Production-ready GitHub Actions + Claude Code automation blueprint",
+  "type": "module",
+  "scripts": {
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "keywords": [
+    "github-actions",
+    "claude-code",
+    "automation",
+    "workflow",
+    "ci-cd",
+    "blueprint"
+  ],
+  "author": "Reza Rezvani",
+  "license": "MIT",
+  "devDependencies": {
+    "vitepress": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

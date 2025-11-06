@@ -1,0 +1,190 @@
+name: Sync Documentation to GitHub Wiki
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'scripts/transform-docs-for-wiki.sh'
+      - 'scripts/generate-wiki-sidebar.sh'
+  workflow_dispatch:
+    inputs:
+      force_sync:
+        description: 'Force full wiki sync (ignore cache)'
+        required: false
+        default: 'false'
+
+# Prevent concurrent wiki syncs to avoid conflicts
+concurrency:
+  group: wiki-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync-to-wiki:
+    name: Sync docs/ to GitHub Wiki
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for proper transformation
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Prepare wiki directory
+        run: |
+          mkdir -p wiki
+          echo "📝 Preparing documentation for wiki publishing..."
+
+      - name: Transform documentation for wiki format
+        run: |
+          chmod +x scripts/transform-docs-for-wiki.sh
+          ./scripts/transform-docs-for-wiki.sh
+        env:
+          SOURCE_DIR: docs
+          OUTPUT_DIR: wiki
+          REPO_NAME: ${{ github.repository }}
+
+      - name: Generate wiki sidebar navigation
+        run: |
+          chmod +x scripts/generate-wiki-sidebar.sh
+          ./scripts/generate-wiki-sidebar.sh
+        env:
+          WIKI_DIR: wiki
+          REPO_URL: https://github.com/${{ github.repository }}
+          PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+
+      - name: Create wiki home page
+        run: |
+          cat > wiki/Home.md << 'EOF'
+          # GitHub Workflow Blueprint - Documentation
+
+          Welcome to the **GitHub Workflow Blueprint** documentation! This blueprint provides production-ready automation for GitHub + Claude Code workflows.
+
+          ## 🚀 Quick Start
+
+          **New to the blueprint?** Start here:
+          - [[Quick Start|Quick-Start]] - 5-minute setup guide
+          - [[Complete Setup|Complete-Setup]] - Detailed installation instructions
+
+          ## 📚 Core Documentation
+
+          ### Workflows
+          Learn about the 8 GitHub Actions workflows that power the blueprint:
+          - [[Workflows Overview|Workflows]] - Complete workflow reference
+          - [[Bootstrap|Workflows#bootstrap]] - One-time repository setup
+          - [[PR Checks|Workflows#pr-checks]] - Quality gates for pull requests
+          - [[Plan to Issues|Workflows#plan-to-issues]] - Convert Claude plans to GitHub issues
+
+          ### Slash Commands
+          Discover the 8 powerful slash commands for interactive operations:
+          - [[Commands Overview|Commands]] - Complete command reference
+          - [[blueprint-init|Commands#blueprint-init]] - Interactive setup wizard
+          - [[plan-to-issues|Commands#plan-to-issues]] - Convert plans to issues
+          - [[commit-smart|Commands#commit-smart]] - Smart commits with quality checks
+
+          ## 🔧 Guides & Reference
+
+          - [[Troubleshooting]] - Common issues and solutions
+          - [[Customization]] - Advanced configuration options
+          - [[Architecture]] - System design and technical decisions
+
+          ## 📦 What's Included
+
+          ✅ **8 GitHub Actions Workflows** - Complete automation from planning to deployment
+          ✅ **8 Slash Commands** - Interactive operations for daily workflows
+          ✅ **4 Specialized Agents** - Autonomous task completion
+          ✅ **5 Composite Actions** - DRY principles for workflow reuse
+          ✅ **3 Working Examples** - Web (Next.js), Mobile (Expo), Fullstack (MERN)
+          ✅ **8 Test Scenarios** - End-to-end validation
+          ✅ **Setup Wizard** - <5 minute installation
+          ✅ **Comprehensive Docs** - You're reading them!
+
+          ## 🌐 Full Documentation Site
+
+          For a better reading experience with search, modern navigation, and mobile optimization:
+
+          **→ [Visit Full Documentation Site](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }})**
+
+          ## 🔗 Useful Links
+
+          - **[GitHub Repository](https://github.com/${{ github.repository }})** - Source code and examples
+          - **[Issues](https://github.com/${{ github.repository }}/issues)** - Report bugs or request features
+          - **[Discussions](https://github.com/${{ github.repository }}/discussions)** - Community Q&A
+          - **[Releases](https://github.com/${{ github.repository }}/releases)** - Version history and changelogs
+
+          ## 📖 Documentation Navigation
+
+          Use the sidebar (left) to navigate through all documentation pages. All guides are organized by category for easy discovery.
+
+          ---
+
+          **Generated with the GitHub Workflow Blueprint** 🚀
+          _Last updated: $(date +'%Y-%m-%d')_
+          EOF
+
+      - name: Create wiki footer
+        run: |
+          cat > wiki/_Footer.md << 'EOF'
+          ---
+
+          📖 **[Full Documentation Site](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }})** | 🏠 **[Repository](https://github.com/${{ github.repository }})** | 🐛 **[Report Issue](https://github.com/${{ github.repository }}/issues)** | 💬 **[Discussions](https://github.com/${{ github.repository }}/discussions)**
+
+          _Documentation automatically synced from [docs/](https://github.com/${{ github.repository }}/tree/main/docs) folder_
+          EOF
+
+      - name: Validate wiki content
+        run: |
+          echo "🔍 Validating wiki content..."
+
+          # Check that key pages exist
+          required_pages=("Home.md" "_Sidebar.md" "_Footer.md" "Quick-Start.md" "Complete-Setup.md")
+          for page in "${required_pages[@]}"; do
+            if [ ! -f "wiki/$page" ]; then
+              echo "❌ Error: Required page wiki/$page not found"
+              exit 1
+            fi
+          done
+
+          # Count total pages
+          page_count=$(find wiki -name "*.md" | wc -l)
+          echo "✅ Found $page_count wiki pages ready to publish"
+
+          # List all pages
+          echo "📄 Pages to be published:"
+          find wiki -name "*.md" -type f | sort
+
+      - name: Publish to GitHub Wiki
+        uses: Andrew-Chen-Wang/github-wiki-action@v4
+        env:
+          WIKI_DIR: wiki/
+          GH_TOKEN: ${{ secrets.WIKI_TOKEN }}
+          GH_MAIL: wiki-bot@users.noreply.github.com
+          GH_NAME: Wiki Bot
+          REPO: ${{ github.repository }}
+
+      - name: Verify wiki publication
+        if: success()
+        run: |
+          echo "✅ Wiki publication successful!"
+          echo "📖 View wiki at: https://github.com/${{ github.repository }}/wiki"
+          echo "🏠 Wiki home: https://github.com/${{ github.repository }}/wiki/Home"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Wiki sync failed!"
+          echo "Please check:"
+          echo "  1. WIKI_TOKEN secret is configured with correct permissions"
+          echo "  2. Repository wiki is enabled (Settings → Features → Wikis)"
+          echo "  3. Transformation scripts executed successfully"
+          echo "  4. Wiki content validates correctly"

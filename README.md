@@ -207,6 +207,15 @@ Built-in protections ensure safe, reliable automation:
 
 ## 📚 Documentation
 
+### 🌐 Documentation Sites
+
+**→ [📖 Full Documentation Site](https://rezarezvani.github.io/claudecode-github-bluprint/)** - Modern docs with search & navigation
+**→ [📝 GitHub Wiki](https://github.com/rezarezvani/claudecode-github-bluprint/wiki)** - Quick reference & community docs
+
+*Both sites auto-update from the [docs/](docs/) folder on every commit to main.*
+
+---
+
 ### Getting Started
 - **[Quick Start Guide](docs/QUICK_START.md)** - 5-minute setup and first workflow
 - **[Complete Setup Guide](docs/COMPLETE_SETUP.md)** - Detailed installation and configuration

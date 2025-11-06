@@ -1,0 +1,270 @@
+/**
+ * Custom theme styles for GitHub Workflow Blueprint documentation
+ * Extends VitePress default theme with brand colors and enhancements
+ */
+
+/**
+ * Colors
+ * -------------------------------------------------------------------------- */
+
+:root {
+  /* Brand colors - Purple/Indigo gradient theme */
+  --vp-c-brand-1: #667eea;
+  --vp-c-brand-2: #764ba2;
+  --vp-c-brand-3: #5568d3;
+  --vp-c-brand-soft: rgba(102, 126, 234, 0.14);
+
+  /* Custom accent colors */
+  --vp-c-success: #10b981;
+  --vp-c-warning: #f59e0b;
+  --vp-c-danger: #ef4444;
+  --vp-c-info: #3b82f6;
+}
+
+.dark {
+  --vp-c-brand-1: #8b9aff;
+  --vp-c-brand-2: #9575cd;
+  --vp-c-brand-3: #7189ff;
+  --vp-c-brand-soft: rgba(139, 154, 255, 0.16);
+}
+
+/**
+ * Component: Button
+ * -------------------------------------------------------------------------- */
+
+:root {
+  --vp-button-brand-border: transparent;
+  --vp-button-brand-text: var(--vp-c-white);
+  --vp-button-brand-bg: var(--vp-c-brand-1);
+  --vp-button-brand-hover-border: transparent;
+  --vp-button-brand-hover-text: var(--vp-c-white);
+  --vp-button-brand-hover-bg: var(--vp-c-brand-2);
+  --vp-button-brand-active-border: transparent;
+  --vp-button-brand-active-text: var(--vp-c-white);
+  --vp-button-brand-active-bg: var(--vp-c-brand-1);
+}
+
+/**
+ * Component: Home
+ * -------------------------------------------------------------------------- */
+
+:root {
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(
+    135deg,
+    var(--vp-c-brand-1) 0%,
+    var(--vp-c-brand-2) 100%
+  );
+
+  --vp-home-hero-image-background-image: linear-gradient(
+    135deg,
+    rgba(102, 126, 234, 0.3) 0%,
+    rgba(118, 75, 162, 0.3) 100%
+  );
+  --vp-home-hero-image-filter: blur(44px);
+}
+
+@media (min-width: 640px) {
+  :root {
+    --vp-home-hero-image-filter: blur(56px);
+  }
+}
+
+@media (min-width: 960px) {
+  :root {
+    --vp-home-hero-image-filter: blur(68px);
+  }
+}
+
+/**
+ * Component: Custom Block
+ * -------------------------------------------------------------------------- */
+
+:root {
+  --vp-custom-block-tip-border: transparent;
+  --vp-custom-block-tip-text: var(--vp-c-text-1);
+  --vp-custom-block-tip-bg: var(--vp-c-success);
+  --vp-custom-block-tip-code-bg: var(--vp-c-brand-soft);
+}
+
+/**
+ * Component: Algolia (if using Algolia search)
+ * -------------------------------------------------------------------------- */
+
+.DocSearch {
+  --docsearch-primary-color: var(--vp-c-brand-1) !important;
+}
+
+/**
+ * Custom Enhancements
+ * -------------------------------------------------------------------------- */
+
+/* Feature cards on home page */
+.VPFeature {
+  transition: all 0.3s ease;
+}
+
+.VPFeature:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* Code blocks */
+.vp-doc div[class*='language-'] {
+  border-radius: 8px;
+  margin: 1.5rem 0;
+}
+
+.vp-doc div[class*='language-'] code {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Badge styles for workflow status */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 12px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.badge-success {
+  background-color: var(--vp-c-success);
+  color: white;
+}
+
+.badge-warning {
+  background-color: var(--vp-c-warning);
+  color: white;
+}
+
+.badge-info {
+  background-color: var(--vp-c-info);
+  color: white;
+}
+
+/* Custom containers */
+.custom-container {
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  margin: 1.5rem 0;
+}
+
+.custom-container.tip {
+  border-left: 4px solid var(--vp-c-success);
+  background-color: rgba(16, 185, 129, 0.1);
+}
+
+.custom-container.warning {
+  border-left: 4px solid var(--vp-c-warning);
+  background-color: rgba(245, 158, 11, 0.1);
+}
+
+.custom-container.danger {
+  border-left: 4px solid var(--vp-c-danger);
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* Table improvements */
+.vp-doc table {
+  display: block;
+  overflow-x: auto;
+  border-radius: 8px;
+}
+
+.vp-doc th {
+  background-color: var(--vp-c-brand-soft);
+  font-weight: 600;
+}
+
+/* Sidebar improvements */
+.VPSidebar {
+  padding-top: 24px;
+}
+
+.VPSidebarItem.level-0 {
+  font-weight: 600;
+  margin-top: 16px;
+}
+
+/* Navigation improvements */
+.VPNavBar {
+  backdrop-filter: blur(8px);
+}
+
+/* Footer improvements */
+.VPFooter {
+  border-top: 1px solid var(--vp-c-divider);
+  padding-top: 32px;
+  margin-top: 64px;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .vp-doc div[class*='language-'] code {
+    font-size: 13px;
+  }
+
+  .VPFeature {
+    margin-bottom: 16px;
+  }
+}
+
+/* Improved code copy button */
+div[class*='language-'] .copy {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+div[class*='language-']:hover .copy {
+  opacity: 1;
+}
+
+/* Link hover effects */
+.vp-doc a {
+  transition: color 0.2s ease;
+}
+
+.vp-doc a:hover {
+  color: var(--vp-c-brand-2);
+}
+
+/* Improved heading anchors */
+.header-anchor {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.vp-doc h1:hover .header-anchor,
+.vp-doc h2:hover .header-anchor,
+.vp-doc h3:hover .header-anchor,
+.vp-doc h4:hover .header-anchor {
+  opacity: 1;
+}
+
+/* Custom emoji sizing in headings */
+.vp-doc h1 .emoji,
+.vp-doc h2 .emoji,
+.vp-doc h3 .emoji {
+  font-size: 1.2em;
+  vertical-align: middle;
+}
+
+/* Status indicators */
+.status-complete::before {
+  content: '✅ ';
+  color: var(--vp-c-success);
+}
+
+.status-in-progress::before {
+  content: '🟡 ';
+  color: var(--vp-c-warning);
+}
+
+.status-pending::before {
+  content: '⏳ ';
+  color: var(--vp-c-info);
+}
