@@ -1,14 +1,20 @@
 # ─────────────────────────────────────────────────────────────────
-# Dev to Main Workflow (Release Gates)
+# Release to Main Workflow (Release Gates)
 # ─────────────────────────────────────────────────────────────────
 # Validates release pull requests before merging to main (production).
 #
 # Release Gates:
-# - Source must be 'dev' branch only
+# - Source must be dev, test/*, or release/* branches
 # - Production build must succeed
 # - Smoke tests must pass
 # - Security quick scan (informational only)
 # - Deployment readiness checklist
+#
+# Allowed source branches:
+# - dev: Production releases
+# - test/*: Workflow validation and testing
+# - release/*: Hotfix releases
+# - dependabot/*: Automated dependency updates
 #
 # Author: Alireza Rezvani
 # Date: 2025-11-06
@@ -60,19 +66,27 @@ jobs:
             exit 0
           fi
 
-          if [[ "$SOURCE_BRANCH" != "dev" ]]; then
+          # Allowlist: branches permitted to merge to main
+          # Includes: dev (production), test/* (validation), release/* (hotfixes)
+          ALLOWED_REGEX='^(dev|test/.*|release/.*)$'
+
+          if [[ ! $SOURCE_BRANCH =~ $ALLOWED_REGEX ]]; then
             echo "❌ Invalid source branch: $SOURCE_BRANCH"
             echo ""
-            echo "Only 'dev' branch can be merged to 'main' for releases."
+            echo "Only branches matching the allowlist may be merged to 'main'."
             echo ""
-            echo "Expected: dev → main"
+            echo "Allowed patterns:"
+            echo "  - dev (production releases)"
+            echo "  - test/* (workflow validation)"
+            echo "  - release/* (hotfix releases)"
+            echo ""
             echo "Got: $SOURCE_BRANCH → main"
             echo ""
-            echo "If using a different branching strategy, adjust this workflow."
+            echo "If using a different branching strategy, adjust ALLOWED_REGEX in this workflow."
             exit 1
           fi
 
-          echo "✅ Source branch is valid: dev → main"
+          echo "✅ Source branch is valid: $SOURCE_BRANCH → main"
 
   # ─────────────────────────────────────────────────────────────────
   # Production Build Validation
@@ -397,14 +411,26 @@ jobs:
 
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Overall status
-          if [[ "${{ needs.validate-source.result }}" == "failure" ]] || \
-             [[ "${{ needs.build-prod.result }}" == "failure" ]] || \
-             [[ "${{ needs.smoke-tests.result }}" == "failure" ]] || \
-             [[ "${{ needs.deployment-readiness.result }}" == "failure" ]]; then
+          # Overall status - check if ALL gates passed
+          # Treat anything other than "success" as blocking (including "skipped", "failure", "cancelled")
+          VALIDATE_RESULT="${{ needs.validate-source.result }}"
+          BUILD_RESULT="${{ needs.build-prod.result }}"
+          SMOKE_RESULT="${{ needs.smoke-tests.result }}"
+          DEPLOY_RESULT="${{ needs.deployment-readiness.result }}"
+
+          if [[ "$VALIDATE_RESULT" != "success" ]] || \
+             [[ "$BUILD_RESULT" != "success" ]] || \
+             [[ "$SMOKE_RESULT" != "success" ]] || \
+             [[ "$DEPLOY_RESULT" != "success" ]]; then
             echo "## ❌ Release Blocked" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "One or more release gates failed. Please fix the issues before merging to production." >> $GITHUB_STEP_SUMMARY
+            echo "One or more release gates did not pass. Please fix the issues before merging to production." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Gate Results:**" >> $GITHUB_STEP_SUMMARY
+            echo "- Source validation: $VALIDATE_RESULT" >> $GITHUB_STEP_SUMMARY
+            echo "- Production build: $BUILD_RESULT" >> $GITHUB_STEP_SUMMARY
+            echo "- Smoke tests: $SMOKE_RESULT" >> $GITHUB_STEP_SUMMARY
+            echo "- Deployment readiness: $DEPLOY_RESULT" >> $GITHUB_STEP_SUMMARY
             exit 1
           else
             echo "## ✅ Release Approved" >> $GITHUB_STEP_SUMMARY
