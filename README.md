@@ -1,6 +1,6 @@
 # GitHub Workflow Blueprint
 
-**Production-Ready GitHub Actions Automation with Claude Code**
+**Production-Ready GitHub Actions Automation Workflow  with Claude Code**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Ready-blue)](https://github.com/features/actions)
@@ -14,7 +14,7 @@
 
 ## 🎯 What Is This?
 
-This repository provides a **complete, copy-paste blueprint** for automating your entire GitHub workflow using **GitHub Actions** and **Claude Code**. From converting plans to issues, creating branches, running quality checks, to deploying to production—everything is automated, intelligent, and production-ready.
+This repository provides a **complete, copy-paste and production-ready blueprint** for automating your entire GitHub workflow using **GitHub Actions** and **Claude Code**. From converting plans to issues, creating branches, running quality checks, to deploying to production—everything is automated, intelligent, and production-ready. This helps you to keep the context of your tasks preserved in an efficient way. You have installation script available to run through the installation routine and chose your suitable wokrflow.
 
 **Perfect for**: Solo developers, small teams, and enterprises looking to streamline their development workflow with AI-powered automation.
 
