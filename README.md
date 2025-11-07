@@ -190,6 +190,34 @@ The blueprint supports all three strategies out of the box. Choose during setup.
 
 ---
 
+## 🔀 Special Branch Patterns
+
+The `Release to Main` workflow allows specific branch patterns to merge directly to `main`:
+
+| Pattern | Purpose | Use Case |
+|---------|---------|----------|
+| `dev` | Production releases | Standard release flow (dev → main) |
+| `test/*` | Workflow validation | Testing CI/CD changes (e.g., test/workflow-validation) |
+| `release/*` | Hotfix releases | Emergency fixes bypassing dev (e.g., release/1.0.1) |
+| `dependabot/*` | Dependency updates | Automated dependency PRs |
+
+**Example:**
+```bash
+# Test workflow changes
+git checkout -b test/new-ci-feature
+git push origin test/new-ci-feature
+# PR to main will run all release gates
+
+# Emergency hotfix
+git checkout -b release/1.0.1-security-patch
+git push origin release/1.0.1-security-patch
+# PR to main with fast-track release gates
+```
+
+All other branches must follow the standard flow (feature/* → dev → main).
+
+---
+
 ## 🔒 Security & Safety
 
 Built-in protections ensure safe, reliable automation:
